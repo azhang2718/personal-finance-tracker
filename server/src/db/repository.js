@@ -254,22 +254,24 @@ export function upsertTransaction({ id, accountId, date, name, amountCents, cate
 
 /**
  * Monthly expense/income totals from the transactions cache, oldest→newest.
- * Expenses: positive amounts on cash/credit accounts; income: negative
- * amounts on depository ('cash') accounts, sign-flipped. Transfers between
- * own accounts excluded via primary category TRANSFER_IN / TRANSFER_OUT.
+ * Expenses: positive amounts on cash/credit accounts, transfers excluded
+ * (TRANSFER_IN/TRANSFER_OUT). Income: EVERY inflow (negative amount) on a
+ * depository ('cash') account, sign-flipped — transfers included by owner's
+ * definition: anything arriving in checking counts.
  */
 export function getSpendingByMonth(sinceDate) {
   const db = getDb();
   return db.prepare(`
     SELECT
       substr(t.date, 1, 7) AS month,
-      SUM(CASE WHEN t.amount_cents > 0 AND a.type IN ('cash','credit') THEN t.amount_cents ELSE 0 END) AS expenses_cents,
+      SUM(CASE WHEN t.amount_cents > 0 AND a.type IN ('cash','credit')
+                AND t.category NOT IN ('TRANSFER_IN', 'TRANSFER_OUT')
+               THEN t.amount_cents ELSE 0 END) AS expenses_cents,
       SUM(CASE WHEN t.amount_cents < 0 AND a.type = 'cash' THEN -t.amount_cents ELSE 0 END) AS income_cents
     FROM transactions_cache t
     JOIN accounts a ON a.id = t.account_id
     WHERE t.date >= ?
       AND t.pending = 0
-      AND t.category NOT IN ('TRANSFER_IN', 'TRANSFER_OUT')
     GROUP BY substr(t.date, 1, 7)
     ORDER BY month ASC
   `).all(sinceDate);
