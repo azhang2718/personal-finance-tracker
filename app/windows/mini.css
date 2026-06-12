@@ -1,16 +1,20 @@
 /* Mini window — DESIGN.md Section 4 (360×480).
+   Stacked glass cards mirroring the dashboard Summary tab.
    Fixed heights for every number so refreshed data causes zero layout shift. */
 
 html, body { overflow: hidden; }
 
 body { padding: var(--s-2); }
 
-/* Glass card treatment (DESIGN.md Section 1 revision) — CSS-level only */
 .mini {
   display: flex;
   flex-direction: column;
+  gap: var(--s-2);
   height: calc(100vh - 2 * var(--s-2));
-  padding: var(--s-4);
+}
+
+.mini-card {
+  padding: var(--s-3);
   background: var(--glass-bg);
   -webkit-backdrop-filter: blur(var(--glass-blur));
   backdrop-filter: blur(var(--glass-blur));
@@ -40,7 +44,7 @@ body { padding: var(--s-2); }
   font-weight: 500;
   line-height: 1.15;
   height: 2.3rem;       /* reserved */
-  margin-top: var(--s-2);
+  margin-top: var(--s-1);
 }
 
 .mini-delta {
@@ -52,8 +56,7 @@ body { padding: var(--s-2); }
 
 .spark-box {
   position: relative;
-  height: 110px;        /* reserved */
-  margin: var(--s-4) 0;
+  height: 84px;         /* reserved */
   border-bottom: 1px solid var(--hairline); /* baseline hairline only */
 }
 
@@ -66,7 +69,7 @@ body { padding: var(--s-2); }
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  height: 28px;         /* reserved per row */
+  height: 26px;         /* reserved per row */
 }
 .mini-alloc li span:first-child { color: var(--ink-soft); }
 
@@ -75,6 +78,6 @@ body { padding: var(--s-2); }
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding-top: var(--s-3);
-  border-top: 1px solid var(--hairline);
+  gap: var(--s-2);
 }
+.mini-footer .btn-primary { flex: 1; }
