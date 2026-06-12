@@ -41,10 +41,11 @@ router.post('/link-token', async (_req, res) => {
     const response = await client.linkTokenCreate({
       user: { client_user_id: 'local-user' },
       client_name: 'Net Worth Tracker',
-      products: [Products.Assets],
-      // balance is accessible via accounts/balance/get with no special product,
-      // but we need at minimum one product — 'assets' works in sandbox.
-      // For real banks use ['transactions'] or ['auth'].
+      // balance is accessible via accounts/balance/get on any item; transactions
+      // covers checking/credit (Chase), investments added when the institution
+      // supports it (Fidelity)
+      products: [Products.Transactions],
+      optional_products: [Products.Investments],
       country_codes: [CountryCode.Us],
       language: 'en',
     });

@@ -61,6 +61,31 @@ The mini window paints from cache instantly and revalidates in the background.
 No real bank credentials ever touch this app — all bank auth flows through
 Plaid Link, and access tokens are stored AES-256-GCM-encrypted.
 
+## Going to production (real banks)
+
+Production Plaid requires steps in the Plaid dashboard — none of this is code:
+
+1. **Request production access** at dashboard.plaid.com → Settings → Compliance
+   (one-time approval questionnaire) and add a billing method. Plaid production
+   is pay-as-you-go (Balance/Transactions are billed per connected account per
+   month — check current pricing; two or three personal items costs a few
+   dollars/month at most).
+2. Copy your **production secret** (Developers → Keys — same `client_id`,
+   different secret per environment).
+3. In `server.env` (packaged app) or `server/.env` (dev), set:
+   `PLAID_ENV=production` and `PLAID_SECRET=<production secret>`.
+4. **OAuth institutions (Chase is one):** production Chase connections go
+   through Chase's own OAuth page, which requires registering a redirect URI in
+   the Plaid dashboard (Developers → API → Allowed redirect URIs) and completing
+   Plaid's OAuth institution registration for Chase. Do this before attempting a
+   production Chase link; non-OAuth institutions (most, incl. Fidelity) work
+   without it.
+5. Sandbox and production data are separate: items connected in sandbox don't
+   carry over. Connect your real accounts fresh once `PLAID_ENV=production`.
+
+The app code is environment-agnostic — `PLAID_ENV` alone selects the
+endpoint. Keep the sandbox keys around for testing.
+
 ## macOS packaging & install
 
 `npm run dist` must be run **on the MacBook** (electron-builder mac targets
