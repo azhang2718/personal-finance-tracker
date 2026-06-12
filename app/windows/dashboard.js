@@ -205,15 +205,21 @@
   // ---------------------------------------------------------------
 
   function renderDonut(allocation) {
-    const investments = allocation.investment_cents || 0;
+    // Older cached payloads may lack the per-class keys — fall back to the
+    // investment total as stocks.
+    const stocks = allocation.investment_stocks_cents ?? allocation.investment_cents ?? 0;
+    const crypto = allocation.investment_crypto_cents || 0;
+    const invCash = allocation.investment_cash_cents || 0;
     const collectibles = allocation.collectibles_cents || 0;
     const cash = allocation.cash_cents || 0;
     const credit = allocation.credit_cents || 0;
 
     const slices = [
-      { label: 'Investments', value: investments, color: cssVar('--accent') },
+      { label: 'Stocks', value: stocks, color: cssVar('--accent') },
+      { label: 'Crypto', value: crypto, color: 'rgba(26, 26, 26, 0.45)' },
       { label: 'Collectibles', value: collectibles, color: 'rgba(26, 26, 26, 0.7)' },
       { label: 'Cash', value: cash, color: cssVar('--ink-soft') },
+      { label: 'Fidelity cash', value: invCash, color: 'rgba(26, 26, 26, 0.25)' },
     ].filter((s) => s.value > 0);
 
     const positiveTotal = slices.reduce((a, s) => a + s.value, 0);

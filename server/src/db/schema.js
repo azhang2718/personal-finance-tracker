@@ -66,5 +66,14 @@ export function runMigrations() {
     );
   `);
 
+  // Idempotent column add: asset_class on accounts ('stocks'|'crypto'|'cash'
+  // for investment sub-buckets; NULL elsewhere — NULL investment = stocks).
+  const hasAssetClass = db
+    .prepare(`SELECT COUNT(*) AS n FROM pragma_table_info('accounts') WHERE name = 'asset_class'`)
+    .get().n > 0;
+  if (!hasAssetClass) {
+    db.exec(`ALTER TABLE accounts ADD COLUMN asset_class TEXT NULL`);
+  }
+
   console.log('[db] Migrations complete');
 }

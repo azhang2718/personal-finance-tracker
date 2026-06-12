@@ -31,9 +31,15 @@
     if (data.last_refresh) $('mini-time').textContent = FMT.shortWhen(data.last_refresh);
 
     const alloc = data.allocation;
-    $('alloc-investments').textContent = FMT.dollars(alloc.investment_cents || 0);
+    // Older cached payloads may lack the per-class keys — treat all
+    // investments as stocks then.
+    $('alloc-stocks').textContent = FMT.dollars(alloc.investment_stocks_cents ?? alloc.investment_cents ?? 0);
+    $('alloc-crypto').textContent = FMT.dollars(alloc.investment_crypto_cents || 0);
     $('alloc-collectibles').textContent = FMT.dollars(alloc.collectibles_cents || 0);
-    $('alloc-cashcredit').textContent = FMT.dollars((alloc.cash_cents || 0) + (alloc.credit_cents || 0));
+    // Investment cash folds into the cash − credit row.
+    $('alloc-cashcredit').textContent = FMT.dollars(
+      (alloc.cash_cents || 0) + (alloc.investment_cash_cents || 0) + (alloc.credit_cents || 0)
+    );
 
     if (meta && meta.fromCache) {
       // Cached paint — if revalidation later fails, the stale line stays.

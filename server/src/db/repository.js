@@ -67,6 +67,7 @@ export function getLatestByAccount() {
       a.name,
       a.source,
       a.type,
+      a.asset_class,
       a.plaid_item_id,
       a.needs_reauth,
       s.balance_cents,
@@ -147,13 +148,21 @@ export function deleteItem(itemId) {
 /**
  * Creates an account row.
  */
-export function createAccount({ name, source, type, plaidAccountId, plaidItemId }) {
+export function createAccount({ name, source, type, plaidAccountId, plaidItemId, assetClass }) {
   const db = getDb();
   const result = db.prepare(`
-    INSERT INTO accounts (name, source, type, plaid_account_id, plaid_item_id)
-    VALUES (?, ?, ?, ?, ?)
-  `).run(name, source, type, plaidAccountId ?? null, plaidItemId ?? null);
+    INSERT INTO accounts (name, source, type, plaid_account_id, plaid_item_id, asset_class)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(name, source, type, plaidAccountId ?? null, plaidItemId ?? null, assetClass ?? null);
   return result.lastInsertRowid;
+}
+
+/**
+ * Sets the asset_class of an account ('stocks' | 'crypto' | 'cash' | null).
+ */
+export function setAccountAssetClass(accountId, assetClass) {
+  const db = getDb();
+  db.prepare(`UPDATE accounts SET asset_class = ? WHERE id = ?`).run(assetClass, accountId);
 }
 
 /**

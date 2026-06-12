@@ -13,6 +13,7 @@ import {
   getAccountsByItemId,
   upsertSnapshot,
 } from '../db/repository.js';
+import { splitInvestmentSnapshots } from '../plaid/investments.js';
 
 const router = Router();
 
@@ -117,6 +118,10 @@ async function ingestPublicToken(public_token, institution_name) {
     upsertSnapshot(account.id, today, balanceCents);
   }
 
+  // Split investment accounts into stocks/crypto/cash via holdings (no-op if
+  // the item doesn't support investments).
+  await splitInvestmentSnapshots(client, accessToken, itemId, plaidAccounts, today);
+
   return { item_id: itemId, accounts_created: created.length };
 }
 
@@ -205,7 +210,15 @@ router.post('/refresh', async (req, res) => {
         upsertSnapshot(account.id, today, balanceCents);
       }
 
-      results.push({ item_id: item.id, institution: item.institution_name, status: 'ok' });
+      // Per-asset-class snapshots for investment accounts (graceful fallback)
+      const split = await splitInvestmentSnapshots(client, accessToken, item.id, plaidAccounts, today);
+
+      results.push({
+        item_id: item.id,
+        institution: item.institution_name,
+        status: 'ok',
+        ...(split.split ? { investment_split: split.classes } : {}),
+      });
     } catch (err) {
       const errorCode = err.response?.data?.error_code;
       if (errorCode === 'ITEM_LOGIN_REQUIRED') {

@@ -10,6 +10,7 @@ import {
   logRefresh,
 } from './db/repository.js';
 import { scrapeCollectr } from './collectr/scrape.js';
+import { splitInvestmentSnapshots } from './plaid/investments.js';
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10);
@@ -62,6 +63,10 @@ async function refreshPlaid() {
         const balanceCents = Math.round((account.type === 'credit' ? -Math.abs(raw) : raw) * 100);
         upsertSnapshot(account.id, today, balanceCents);
       }
+
+      // Investment accounts: split into stocks/crypto/cash sub-accounts via
+      // holdings (falls back to the total snapshot just written).
+      await splitInvestmentSnapshots(client, accessToken, item.id, plaidAccounts, today);
 
       results.push({
         source: 'plaid',

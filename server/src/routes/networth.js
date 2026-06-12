@@ -54,12 +54,18 @@ router.get('/networth/current', (req, res) => {
 
     let totalCents = 0;
     const allocation = { cash: 0, credit: 0, investment: 0, collectibles: 0 };
+    // Investment broken out by asset_class; NULL counts as stocks.
+    const invByClass = { stocks: 0, crypto: 0, cash: 0 };
 
     for (const a of accounts) {
       const bal = a.balance_cents ?? 0;
       totalCents += bal;
       if (a.type in allocation) {
         allocation[a.type] += bal;
+      }
+      if (a.type === 'investment') {
+        const cls = a.asset_class in invByClass ? a.asset_class : 'stocks';
+        invByClass[cls] += bal;
       }
     }
 
@@ -87,6 +93,9 @@ router.get('/networth/current', (req, res) => {
         cash_cents: allocation.cash,
         credit_cents: allocation.credit,
         investment_cents: allocation.investment,
+        investment_stocks_cents: invByClass.stocks,
+        investment_crypto_cents: invByClass.crypto,
+        investment_cash_cents: invByClass.cash,
         collectibles_cents: allocation.collectibles,
       },
       last_refresh: lastRefresh?.ran_at ?? null,
