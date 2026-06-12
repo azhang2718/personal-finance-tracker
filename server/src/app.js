@@ -5,7 +5,6 @@ import healthRouter from './routes/health.js';
 import plaidRouter from './routes/plaid.js';
 import collectiblesRouter from './routes/collectibles.js';
 import networthRouter from './routes/networth.js';
-import oauthRouter from './routes/oauth.js';
 
 // Patterns that indicate sensitive data
 const SENSITIVE_PATTERNS = [
@@ -102,7 +101,6 @@ export function createApp() {
   app.use('/api/plaid', plaidRouter);
   app.use('/api', collectiblesRouter);
   app.use('/api', networthRouter);
-  app.use('/', oauthRouter);
 
   // 404
   app.use((_req, res) => {

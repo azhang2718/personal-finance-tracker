@@ -410,24 +410,44 @@
   // Plaid Link
   // ---------------------------------------------------------------
 
+  // Hosted Link: the server returns a Plaid-hosted HTTPS URL that runs the
+  // whole flow (including bank OAuth pages, e.g. Chase). We open it and poll
+  // the server until the session completes.
+  let hostedPollTimer = null;
+
+  function pollHostedSession(onDone) {
+    if (hostedPollTimer) clearInterval(hostedPollTimer);
+    const startedAt = Date.now();
+    hostedPollTimer = setInterval(async () => {
+      if (Date.now() - startedAt > 15 * 60 * 1000) {
+        clearInterval(hostedPollTimer);
+        hostedPollTimer = null;
+        return;
+      }
+      try {
+        const result = await API.hostedStatus();
+        if (result.status === 'connected') {
+          clearInterval(hostedPollTimer);
+          hostedPollTimer = null;
+          await onDone();
+        } else if (result.status === 'exited') {
+          clearInterval(hostedPollTimer);
+          hostedPollTimer = null;
+        }
+      } catch (err) {
+        // keep polling; transient errors are fine
+      }
+    }, 3000);
+  }
+
   async function connectBank() {
     try {
-      const { link_token } = await API.linkToken();
-      const handler = Plaid.create({
-        token: link_token,
-        onSuccess: async (publicToken, metadata) => {
-          const institution = metadata && metadata.institution ? metadata.institution.name : 'Unknown Institution';
-          try {
-            await API.exchange(publicToken, institution);
-            await API.refresh(false).catch(() => {});
-            await loadAll();
-          } catch (err) {
-            showGlobalError('Connecting the bank failed — try again.', 'Connect bank', connectBank);
-          }
-        },
-        onExit: () => {},
+      const { hosted_link_url } = await API.linkToken();
+      window.open(hosted_link_url, '_blank');
+      pollHostedSession(async () => {
+        await API.refresh(false).catch(() => {});
+        await loadAll();
       });
-      handler.open();
     } catch (err) {
       showGlobalError('Could not reach the local server to start Plaid Link.', 'Retry', connectBank);
     }
@@ -435,16 +455,12 @@
 
   async function reconnectItem(itemId) {
     try {
-      const { link_token } = await API.reauthToken(itemId);
-      const handler = Plaid.create({
-        token: link_token,
-        onSuccess: async () => {
-          await API.refresh(false).catch(() => {});
-          await loadAll();
-        },
-        onExit: () => {},
+      const { hosted_link_url } = await API.reauthToken(itemId);
+      window.open(hosted_link_url, '_blank');
+      pollHostedSession(async () => {
+        await API.refresh(false).catch(() => {});
+        await loadAll();
       });
-      handler.open();
     } catch (err) {
       showGlobalError('Could not start the reconnect flow — try again.', null, null);
     }

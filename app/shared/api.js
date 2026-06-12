@@ -131,6 +131,7 @@
     exchange: (publicToken, institutionName) =>
       postJson('/api/plaid/exchange', { public_token: publicToken, institution_name: institutionName }),
     reauthToken: (itemId) => postJson(`/api/plaid/reauth-token/${itemId}`),
+    hostedStatus: () => fetchJson('/api/plaid/hosted/status'),
     deleteItem: (itemId) => del(`/api/plaid/items/${itemId}`),
     setManualCollectibles: (cents) => putJson('/api/collectibles/manual', { balance_cents: cents }),
     exportCsvUrl: () => baseUrl() + '/api/export.csv',

@@ -16,13 +16,12 @@ import {
 
 const router = Router();
 
-// OAuth redirect URI — must exactly match a URI registered in the Plaid
-// dashboard (Developers → API → Allowed redirect URIs)
-const OAUTH_REDIRECT_URI = process.env.PLAID_REDIRECT_URI || 'http://localhost:8123/plaid-oauth-return';
-
-// Most recent link token, held in memory so the OAuth resume page can
-// re-initialize Link after the bank redirects back. Single local user;
-// never persisted.
+// Hosted Link: Plaid hosts the entire Link flow (incl. OAuth redirects for
+// Chase) on its own HTTPS page, so no local redirect URI is needed —
+// production rejects http:// redirect URIs, which rules out the local
+// resume-page approach for a loopback desktop app.
+// Most recent link token, held in memory so /hosted/status can poll for the
+// session result. Single local user; never persisted.
 let lastLinkToken = null;
 export function getLastLinkToken() {
   return lastLinkToken;
@@ -60,16 +59,66 @@ router.post('/link-token', async (_req, res) => {
       optional_products: [Products.Investments],
       country_codes: [CountryCode.Us],
       language: 'en',
-      redirect_uri: OAUTH_REDIRECT_URI,
+      hosted_link: { url_lifetime_seconds: 900 },
     });
     // Only return the link token — never return secrets
     lastLinkToken = response.data.link_token;
-    res.json({ link_token: response.data.link_token });
+    res.json({
+      link_token: response.data.link_token,
+      hosted_link_url: response.data.hosted_link_url,
+    });
   } catch (err) {
     console.error('[plaid] link-token error:', err.response?.data?.error_message ?? err.message);
     res.status(500).json({ error: 'Failed to create link token' });
   }
 });
+
+// Exchange a public token, persist the encrypted access token, create
+// accounts, write today's snapshots. Shared by /exchange and /hosted/status.
+async function ingestPublicToken(public_token, institution_name) {
+  const client = getPlaidClient();
+
+  // Exchange public token for access token
+  const exchangeRes = await client.itemPublicTokenExchange({ public_token });
+  const accessToken = exchangeRes.data.access_token;
+  // access_token never returned to client
+
+  // Store encrypted
+  const itemId = saveItem(institution_name ?? 'Unknown Institution', accessToken);
+
+  // Fetch accounts
+  const accountsRes = await client.accountsGet({ access_token: accessToken });
+  const plaidAccounts = accountsRes.data.accounts;
+
+  const created = [];
+  for (const pa of plaidAccounts) {
+    const type = mapPlaidType(pa.type, pa.subtype);
+    const existing = findAccountByPlaidId(pa.account_id);
+    if (!existing) {
+      const id = createAccount({
+        name: pa.name,
+        source: 'plaid',
+        type,
+        plaidAccountId: pa.account_id,
+        plaidItemId: itemId,
+      });
+      created.push({ id, name: pa.name, type });
+    }
+  }
+
+  // Write initial snapshots
+  const today = todayStr();
+  for (const pa of plaidAccounts) {
+    const account = findAccountByPlaidId(pa.account_id);
+    if (!account) continue;
+    const raw = pa.balances?.current ?? 0;
+    // Credit balances stored as negative
+    const balanceCents = Math.round((account.type === 'credit' ? -Math.abs(raw) : raw) * 100);
+    upsertSnapshot(account.id, today, balanceCents);
+  }
+
+  return { item_id: itemId, accounts_created: created.length };
+}
 
 // POST /api/plaid/exchange
 // Body: { public_token, institution_name }
@@ -78,51 +127,45 @@ router.post('/exchange', async (req, res) => {
   if (!public_token) return res.status(400).json({ error: 'public_token is required' });
 
   try {
-    const client = getPlaidClient();
-
-    // Exchange public token for access token
-    const exchangeRes = await client.itemPublicTokenExchange({ public_token });
-    const accessToken = exchangeRes.data.access_token;
-    // access_token never returned to client
-
-    // Store encrypted
-    const itemId = saveItem(institution_name ?? 'Unknown Institution', accessToken);
-
-    // Fetch accounts
-    const accountsRes = await client.accountsGet({ access_token: accessToken });
-    const plaidAccounts = accountsRes.data.accounts;
-
-    const created = [];
-    for (const pa of plaidAccounts) {
-      const type = mapPlaidType(pa.type, pa.subtype);
-      const existing = findAccountByPlaidId(pa.account_id);
-      if (!existing) {
-        const id = createAccount({
-          name: pa.name,
-          source: 'plaid',
-          type,
-          plaidAccountId: pa.account_id,
-          plaidItemId: itemId,
-        });
-        created.push({ id, name: pa.name, type });
-      }
-    }
-
-    // Write initial snapshots
-    const today = todayStr();
-    for (const pa of plaidAccounts) {
-      const account = findAccountByPlaidId(pa.account_id);
-      if (!account) continue;
-      const raw = pa.balances?.current ?? 0;
-      // Credit balances stored as negative
-      const balanceCents = Math.round((account.type === 'credit' ? -Math.abs(raw) : raw) * 100);
-      upsertSnapshot(account.id, today, balanceCents);
-    }
-
-    res.json({ item_id: itemId, accounts_created: created.length });
+    res.json(await ingestPublicToken(public_token, institution_name));
   } catch (err) {
     console.error('[plaid] exchange error:', err.response?.data?.error_message ?? err.message);
     res.status(500).json({ error: 'Failed to exchange token' });
+  }
+});
+
+// GET /api/plaid/hosted/status
+// Polls the current Hosted Link session. When the user finishes the flow in
+// the browser, ingest the resulting public token and report success.
+router.get('/hosted/status', async (_req, res) => {
+  if (!lastLinkToken) {
+    return res.status(404).json({ error: 'No Link session in progress' });
+  }
+  try {
+    const client = getPlaidClient();
+    const tokenRes = await client.linkTokenGet({ link_token: lastLinkToken });
+    const sessions = tokenRes.data.link_sessions ?? [];
+
+    for (const session of sessions) {
+      const addResults = session.results?.item_add_results ?? [];
+      for (const result of addResults) {
+        if (result.public_token) {
+          const institution = result.institution?.name ?? 'Unknown Institution';
+          // Consume the session so a later poll can't double-ingest
+          lastLinkToken = null;
+          const out = await ingestPublicToken(result.public_token, institution);
+          return res.json({ status: 'connected', institution, ...out });
+        }
+      }
+      if (session.exit) {
+        lastLinkToken = null;
+        return res.json({ status: 'exited' });
+      }
+    }
+    res.json({ status: 'pending' });
+  } catch (err) {
+    console.error('[plaid] hosted-status error:', err.response?.data?.error_message ?? err.message);
+    res.status(500).json({ error: 'Failed to check Link session status' });
   }
 });
 
@@ -229,11 +272,14 @@ router.post('/reauth-token/:id', async (req, res) => {
       country_codes: [CountryCode.Us],
       language: 'en',
       access_token: accessToken, // update mode
-      redirect_uri: OAUTH_REDIRECT_URI,
+      hosted_link: { url_lifetime_seconds: 900 },
     });
 
     lastLinkToken = response.data.link_token;
-    res.json({ link_token: response.data.link_token });
+    res.json({
+      link_token: response.data.link_token,
+      hosted_link_url: response.data.hosted_link_url,
+    });
   } catch (err) {
     console.error('[plaid] reauth-token error:', err.response?.data?.error_message ?? err.message);
     res.status(500).json({ error: 'Failed to create reauth token' });

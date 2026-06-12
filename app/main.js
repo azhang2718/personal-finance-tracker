@@ -1,7 +1,7 @@
 // Electron main process.
 // Spawns the local API server as a child process on launch, kills it on quit.
 // Creates the mini window on startup and the dashboard window on demand.
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
@@ -184,6 +184,12 @@ function createOrFocusDashboard() {
     webPreferences: COMMON_WEB_PREFERENCES,
   });
   dashboardWindow.loadFile(path.join(__dirname, 'windows', 'dashboard.html'));
+  // Hosted Plaid Link (and any other https link) opens in the system browser,
+  // never an Electron child window.
+  dashboardWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('https://')) shell.openExternal(url);
+    return { action: 'deny' };
+  });
   dashboardWindow.on('closed', () => {
     dashboardWindow = null;
   });
