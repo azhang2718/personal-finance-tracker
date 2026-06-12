@@ -16,6 +16,18 @@ import {
 
 const router = Router();
 
+// OAuth redirect URI — must exactly match a URI registered in the Plaid
+// dashboard (Developers → API → Allowed redirect URIs)
+const OAUTH_REDIRECT_URI = process.env.PLAID_REDIRECT_URI || 'http://localhost:8123/plaid-oauth-return';
+
+// Most recent link token, held in memory so the OAuth resume page can
+// re-initialize Link after the bank redirects back. Single local user;
+// never persisted.
+let lastLinkToken = null;
+export function getLastLinkToken() {
+  return lastLinkToken;
+}
+
 // Map Plaid account subtypes/types to our types
 function mapPlaidType(plaidType, plaidSubtype) {
   const t = (plaidType || '').toLowerCase();
@@ -48,8 +60,10 @@ router.post('/link-token', async (_req, res) => {
       optional_products: [Products.Investments],
       country_codes: [CountryCode.Us],
       language: 'en',
+      redirect_uri: OAUTH_REDIRECT_URI,
     });
     // Only return the link token — never return secrets
+    lastLinkToken = response.data.link_token;
     res.json({ link_token: response.data.link_token });
   } catch (err) {
     console.error('[plaid] link-token error:', err.response?.data?.error_message ?? err.message);
@@ -215,8 +229,10 @@ router.post('/reauth-token/:id', async (req, res) => {
       country_codes: [CountryCode.Us],
       language: 'en',
       access_token: accessToken, // update mode
+      redirect_uri: OAUTH_REDIRECT_URI,
     });
 
+    lastLinkToken = response.data.link_token;
     res.json({ link_token: response.data.link_token });
   } catch (err) {
     console.error('[plaid] reauth-token error:', err.response?.data?.error_message ?? err.message);

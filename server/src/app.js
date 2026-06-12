@@ -5,6 +5,7 @@ import healthRouter from './routes/health.js';
 import plaidRouter from './routes/plaid.js';
 import collectiblesRouter from './routes/collectibles.js';
 import networthRouter from './routes/networth.js';
+import oauthRouter from './routes/oauth.js';
 
 // Patterns that indicate sensitive data
 const SENSITIVE_PATTERNS = [
@@ -65,14 +66,17 @@ export function createApp() {
   //  - no Origin header (non-browser clients, e.g. curl or Electron net)
   //  - Origin "null" (file:// pages — how the renderer windows load)
   //  - app:// custom protocol origins
+  //  - the server's own origin (the OAuth resume page it serves itself)
   // Everything else (web origins, extensions) is rejected.
   app.use((req, res, next) => {
     const origin = req.headers.origin;
+    const host = req.headers.host;
     const allowed =
       origin === undefined ||
       origin === 'null' ||
       origin.startsWith('file://') ||
-      origin.startsWith('app://');
+      origin.startsWith('app://') ||
+      (host !== undefined && origin === `http://${host}`);
 
     if (!allowed) {
       res.status(403).json({ error: 'Origin not allowed' });
@@ -98,6 +102,7 @@ export function createApp() {
   app.use('/api/plaid', plaidRouter);
   app.use('/api', collectiblesRouter);
   app.use('/api', networthRouter);
+  app.use('/', oauthRouter);
 
   // 404
   app.use((_req, res) => {
