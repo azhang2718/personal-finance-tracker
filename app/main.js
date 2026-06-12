@@ -157,11 +157,13 @@ function createMiniWindow() {
   miniWindow = new BrowserWindow({
     width: 360,
     height: 480,
+    useContentSize: true, // 360×480 of content — frame/menu don't eat into it
     resizable: false,
     fullscreenable: false,
     maximizable: false,
+    autoHideMenuBar: true,
     title: 'Net Worth',
-    backgroundColor: '#FAF9F6',
+    backgroundColor: '#EEF3F9',
     webPreferences: COMMON_WEB_PREFERENCES,
   });
   miniWindow.loadFile(path.join(__dirname, 'windows', 'mini.html'));
@@ -179,8 +181,9 @@ function createOrFocusDashboard() {
   dashboardWindow = new BrowserWindow({
     width: 1200,
     height: 900,
+    autoHideMenuBar: true,
     title: 'Net Worth Tracker',
-    backgroundColor: '#FAF9F6',
+    backgroundColor: '#EEF3F9',
     webPreferences: COMMON_WEB_PREFERENCES,
   });
   dashboardWindow.loadFile(path.join(__dirname, 'windows', 'dashboard.html'));
