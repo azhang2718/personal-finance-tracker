@@ -4,15 +4,23 @@ import { fileURLToPath } from 'url';
 import fs from 'fs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = path.join(__dirname, '..', '..', 'data');
-const DB_PATH = path.join(DATA_DIR, 'networth.db');
+const DEFAULT_DB_PATH = path.join(__dirname, '..', '..', 'data', 'networth.db');
+
+// DB_PATH env var lets the packaged Electron app point the database at the
+// app's user-data directory. Default remains server/data/networth.db (dev).
+function resolveDbPath() {
+  return process.env.DB_PATH && process.env.DB_PATH.trim() !== ''
+    ? path.resolve(process.env.DB_PATH)
+    : DEFAULT_DB_PATH;
+}
 
 let _db = null;
 
 export function getDb() {
   if (_db) return _db;
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  _db = new Database(DB_PATH);
+  const dbPath = resolveDbPath();
+  fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+  _db = new Database(dbPath);
   _db.pragma('journal_mode = WAL');
   _db.pragma('foreign_keys = ON');
   return _db;

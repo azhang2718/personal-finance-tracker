@@ -61,10 +61,24 @@ export function createApp() {
     })
   );
 
-  // CORS — only allow Chrome extension origins
+  // CORS — Electron renderer origins only:
+  //  - no Origin header (non-browser clients, e.g. curl or Electron net)
+  //  - Origin "null" (file:// pages — how the renderer windows load)
+  //  - app:// custom protocol origins
+  // Everything else (web origins, extensions) is rejected.
   app.use((req, res, next) => {
-    const origin = req.headers.origin || '';
-    if (origin.startsWith('chrome-extension://')) {
+    const origin = req.headers.origin;
+    const allowed =
+      origin === undefined ||
+      origin === 'null' ||
+      origin.startsWith('file://') ||
+      origin.startsWith('app://');
+
+    if (!allowed) {
+      res.status(403).json({ error: 'Origin not allowed' });
+      return;
+    }
+    if (origin !== undefined) {
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
       res.setHeader('Access-Control-Allow-Headers', 'Content-Type');

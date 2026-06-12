@@ -56,9 +56,21 @@ The `server/data/` directory containing the SQLite database is gitignored per sp
 
 ---
 
-## CORS: extension origin only
+## CORS: Electron renderer origins only
 
-CORS is restricted to origins matching `chrome-extension://`. No wildcard. The server also binds to `127.0.0.1` only, so LAN/internet access is impossible regardless.
+CORS allows only requests that look like the Electron app's renderer: requests with **no Origin header**, Origin `null` (what Chromium sends for `file://` pages, which is how the renderer windows load), or origins starting with `file://` or `app://`. Any other origin (web pages, browser extensions) receives 403. No wildcard. The earlier `chrome-extension://` allowance from the extension prototype was removed — the product is an Electron desktop app. The server also binds to `127.0.0.1` by default, so LAN/internet access is impossible regardless.
+
+---
+
+## Configurable HOST and DB_PATH
+
+`HOST` env var (default `127.0.0.1`) controls the bind address; any non-loopback value logs a prominent warning at startup per PRD Section 4.6. `DB_PATH` env var overrides the SQLite file location (default `server/data/networth.db`) so the packaged Electron app can store the DB under `app.getPath('userData')`.
+
+---
+
+## Collectr share URL exposed via `/api/health`
+
+The dashboard settings panel must display the configured Collectr share link (read-only, per DESIGN.md). Rather than a new settings endpoint, `GET /api/health` includes `collectr_share_url`. It is the user's own public share link, not a credential, and the API is loopback-bound.
 
 ---
 

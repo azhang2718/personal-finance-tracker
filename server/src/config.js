@@ -28,6 +28,8 @@ const envSchema = z.object({
     .optional()
     .default('8123')
     .transform((v) => parseInt(v, 10)),
+  HOST: z.string().optional().default('127.0.0.1'),
+  DB_PATH: z.string().optional(),
 });
 
 let _config = null;

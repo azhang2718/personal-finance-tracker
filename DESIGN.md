@@ -10,7 +10,7 @@ Explicitly avoid: gradients, glassmorphism, card shadows, rounded "fintech app" 
 
 ## 2. Design tokens
 
-Implement as CSS custom properties on `:root` in a shared `tokens.css` used by both popup and dashboard.
+Implement as CSS custom properties on `:root` in a shared `tokens.css` used by both the mini window and the dashboard window.
 
 ```css
 :root {
@@ -97,7 +97,7 @@ Implement as CSS custom properties on `:root` in a shared `tokens.css` used by b
 **Accounts table**
 - Hairline row dividers only. Columns: name (sans) + type eyebrow, balance (mono, right-aligned, negatives in `--neg`), status (dot + word + timestamp in `--text-small`). Status dot colors: ok `--pos`, stale `--warn`, error `--neg`. An error row shows its fix inline as a text button: "Reconnect".
 
-## 4. Popup (360 × 480)
+## 4. Mini window (360 × 480)
 
 Same tokens at small scale. Number first, sparkline second, controls last.
 

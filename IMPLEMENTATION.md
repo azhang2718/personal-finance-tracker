@@ -7,7 +7,7 @@ Follow these phases **in order**. Each phase ends with a verification gate — d
 ## Phase 0 — Scaffold & secret hygiene (do this before any code)
 
 **Tasks**
-1. Create the repo structure: `server/` and `chrome-extension/` as described in the requirements doc.
+1. Create the repo structure: `server/` and `app/` (Electron) as described in the requirements doc.
 2. Write `.gitignore` first: `.env`, `server/data/`, `*.db`, `node_modules/`, build output.
 3. Create `server/.env.example` with placeholder values: `PLAID_CLIENT_ID`, `PLAID_SECRET`, `PLAID_ENV=sandbox`, `ENCRYPTION_KEY`, `COLLECTR_SHARE_URL`, `PORT=8123`.
 4. Initialize git and make the first commit containing the `.gitignore` and `.env.example` only.
@@ -22,7 +22,7 @@ Follow these phases **in order**. Each phase ends with a verification gate — d
 ## Phase 1 — Backend foundation
 
 **Tasks**
-1. Express app bound to `127.0.0.1` only, with: JSON body limit (100kb), `express-rate-limit` (60 req/min), CORS restricted to the extension origin, and a logging middleware that **redacts** any field or header containing `token`, `secret`, or `authorization`.
+1. Express app bound to a configurable host (default `127.0.0.1`; non-loopback requires explicit opt-in), with: JSON body limit (100kb), `express-rate-limit` (60 req/min), CORS restricted to the app's renderer origin, and a logging middleware that **redacts** any field or header containing `token`, `secret`, or `authorization`.
 2. `GET /api/health` returning `{ ok: true, env: PLAID_ENV }`.
 3. Config loader that validates all required env vars on boot (fail fast with a clear message listing what's missing) using zod.
 
@@ -93,16 +93,17 @@ Follow these phases **in order**. Each phase ends with a verification gate — d
 
 ---
 
-## Phase 6 — Extension shell
+## Phase 6 — Electron app shell
 
 **Tasks**
-1. Manifest V3: `action.default_popup = popup.html`, dashboard as an extension page; `host_permissions` limited to `http://127.0.0.1:8123/*`. No remote code.
-2. Shared API client module with cache: every GET is served from `chrome.storage.local` immediately, then revalidated in the background (stale-while-revalidate). Popup reads cache only — it never awaits the network before first paint.
-3. "Open dashboard" via `chrome.tabs.create`.
+1. Electron main process (`app/main.js`): spawns the Express server as a child process on launch (dev: `node server/index.js`; packaged: bundled server with user-data-relative DB path), kills it on quit. Two `BrowserWindow`s: a compact mini window (~360×480) and the dashboard window. Renderers use `contextIsolation: true`, `nodeIntegration: false`, with a `preload.js` exposing only a minimal bridge (open dashboard, get/set API base URL). No remote code.
+2. Shared API client module with cache: every GET is served from local cache (`localStorage` or a JSON cache file via the bridge) immediately, then revalidated in the background (stale-while-revalidate). The mini window reads cache only — it never awaits the network before first paint. The API base URL comes from app settings (default `http://127.0.0.1:8123`), never a hardcoded constant, so the app works unchanged on any machine.
+3. "Open dashboard" action in the mini window opens/focuses the dashboard window via the bridge.
 
 **Gate**
-- Extension loads unpacked with zero console errors.
-- With the server stopped, the popup still renders the last cached numbers plus a stale indicator.
+- `npm start` opens both windows with zero console errors.
+- With the server process killed, the mini window still renders the last cached numbers plus a stale indicator.
+- Changing the API base URL in settings repoints the client without code changes.
 
 ---
 
@@ -113,8 +114,8 @@ Build to `ui_design.md` exactly: tokens, layout, all four states (empty/loading/
 **Tasks**
 1. Implement design tokens (CSS custom properties) and base typography first.
 2. Hero: net worth figure + edge-to-edge time-series chart with range toggles.
-3. Allocation donut + accounts table with statuses; Settings panel (Collectr URL display, manual collectibles entry, connect/reconnect/disconnect, export CSV, refresh).
-4. Plaid Link integration in the connect flow (Link runs in the dashboard page).
+3. Allocation donut + accounts table with statuses; Settings panel (Collectr URL display, manual collectibles entry, connect/reconnect/disconnect, export CSV, refresh, API base URL field).
+4. Plaid Link integration in the connect flow (Link runs in the dashboard window's renderer).
 
 **Gate**
 - Side-by-side check against `ui_design.md` wireframes; numerals all tabular mono; only the accent color appears on the chart line and primary buttons.
@@ -123,25 +124,26 @@ Build to `ui_design.md` exactly: tokens, layout, all four states (empty/loading/
 
 ---
 
-## Phase 8 — Popup UI
+## Phase 8 — Mini window UI
 
 **Tasks**
-1. Net worth figure, 7-day delta chip, 30-day sparkline, refresh button, "Open dashboard" — per `ui_design.md` popup spec.
+1. Net worth figure, 7-day delta chip, 30-day sparkline, refresh button, "Open dashboard" — per `ui_design.md` mini-window spec.
 2. First paint from cache in < 1s; refresh button shows inline progress and updates numbers in place.
 
 **Gate**
 - Cold open with network disabled: full render from cache.
-- Lighthouse-style sanity check: no layout shift after data arrives (reserve space for numbers).
+- No layout shift after data arrives (reserve space for numbers).
 
 ---
 
-## Phase 9 — Hardening & delivery QA
+## Phase 9 — Packaging, hardening & delivery QA
 
 **Tasks**
-1. `npm audit` — resolve high/critical.
-2. Secret sweep: grep repo and built extension bundle for `secret`, `access-`, `PLAID`, base64-looking tokens.
-3. Run every acceptance criterion from the requirements doc (Section 7) and record results in `QA.md`.
-4. README: setup, sandbox walkthrough, key rotation procedure, dependency update policy, security posture notes (loopback-only rationale, what must change before any remote exposure).
+1. Packaging: `electron-builder` config producing a macOS `.app`/DMG (Apple Silicon target). The packaged app bundles the server, resolves the DB path from the user-data directory, and works on a fresh machine with no hardcoded paths or addresses. `npm run dist` builds it.
+2. `npm audit` — resolve high/critical.
+3. Secret sweep: grep repo and packaged app bundle for `secret`, `access-`, `PLAID`, base64-looking tokens.
+4. Run every acceptance criterion from the requirements doc (Section 7) and record results in `QA.md`.
+5. README: setup, sandbox walkthrough, packaging/install steps for macOS, key rotation procedure, dependency update policy, security posture notes (loopback-default rationale, what must change before any remote exposure).
 
 **Gate** — all Section 7 acceptance criteria pass. Project complete.
 

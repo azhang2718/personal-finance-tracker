@@ -10,8 +10,19 @@ runMigrations();
 
 const app = createApp();
 
-const server = app.listen(config.PORT, '127.0.0.1', () => {
-  console.log(`[server] Listening on http://127.0.0.1:${config.PORT} (loopback only)`);
+const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1']);
+if (!LOOPBACK_HOSTS.has(config.HOST)) {
+  console.warn('***************************************************************');
+  console.warn(`[server] WARNING: binding to non-loopback host "${config.HOST}".`);
+  console.warn('[server] This exposes your financial data API to the network');
+  console.warn('[server] WITHOUT TLS or authentication. Do not do this unless');
+  console.warn('[server] you have added TLS + auth in front of this server.');
+  console.warn('***************************************************************');
+}
+
+const server = app.listen(config.PORT, config.HOST, () => {
+  const note = LOOPBACK_HOSTS.has(config.HOST) ? ' (loopback only)' : ' (NON-LOOPBACK — see warning above)';
+  console.log(`[server] Listening on http://${config.HOST}:${config.PORT}${note}`);
   console.log(`[server] Plaid environment: ${config.PLAID_ENV}`);
 });
 
