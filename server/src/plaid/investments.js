@@ -10,11 +10,19 @@ import {
   upsertSnapshot,
 } from '../db/repository.js';
 
-// security.type === 'cryptocurrency' → crypto;
+// Spot/futures crypto ETFs report as type 'etf' through Plaid; classify them
+// as crypto by ticker (owner's request — see DECISIONS.md).
+const CRYPTO_ETF_TICKERS = new Set([
+  'HODL', 'FETH', 'FBTC', 'IBIT', 'ETHA', 'GBTC', 'ETHE', 'ARKB', 'BITB',
+  'BTCO', 'EZBC', 'BRRR', 'BTCW', 'ETHW', 'ETHV', 'QETH', 'CETH', 'BITO',
+]);
+
+// security.type === 'cryptocurrency' or known crypto-ETF ticker → crypto;
 // is_cash_equivalent or type 'cash' → cash; everything else → stocks.
 function classifySecurity(security) {
   if (!security) return 'stocks';
   if (security.type === 'cryptocurrency') return 'crypto';
+  if (security.ticker_symbol && CRYPTO_ETF_TICKERS.has(security.ticker_symbol.toUpperCase())) return 'crypto';
   if (security.is_cash_equivalent === true || security.type === 'cash') return 'cash';
   return 'stocks';
 }
