@@ -51,3 +51,22 @@
   ORIGINAL account rows (ids 18, 19 — now the stocks buckets). Pre-split
   history therefore reads as "stocks", which slightly overstates stocks vs
   crypto/cash before 2026-06-12.
+
+## Spending summary endpoint (2026-06-12)
+
+- **Transfer exclusion is category-based only.** Expenses/income exclude
+  transactions whose primary personal-finance category is `TRANSFER_IN` or
+  `TRANSFER_OUT`. Credit-card payments from own checking (`LOAN_PAYMENTS`)
+  are NOT excluded — Plaid can't reliably distinguish paying our own card
+  from paying someone else's loan, and the card charge itself is the expense
+  we count, so a payment shows as money out of checking but the category
+  filter on the card side keeps double counting limited to the LOAN_PAYMENTS
+  rows. Revisit if it skews the numbers.
+- **Cache refresh policy.** `transactions_cache` refreshes from
+  `transactionsGet` at most once per 12 h (meta keys
+  `transactions_refreshed_at` / `transactions_window_start`); a request for
+  an earlier window than previously fetched forces a refresh. Pending
+  transactions are skipped (they re-post with a new id). Per-item fetch
+  failures are logged and skipped; cached rows keep serving.
+- **Income definition.** Negative amounts (money in) on depository accounts
+  only — credit-card refunds are not income.

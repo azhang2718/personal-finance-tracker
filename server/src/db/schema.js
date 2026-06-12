@@ -66,6 +66,26 @@ export function runMigrations() {
     );
   `);
 
+  // Transactions cache for spending statistics + a small key/value meta table
+  // (tracks when the cache was last refreshed). Both idempotent.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS transactions_cache (
+      id TEXT PRIMARY KEY,            -- plaid transaction_id
+      account_id INTEGER,             -- accounts.id
+      date TEXT,
+      name TEXT,
+      amount_cents INTEGER,           -- positive = money out
+      category TEXT,
+      pending INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_txcache_date ON transactions_cache(date);
+
+    CREATE TABLE IF NOT EXISTS meta (
+      key TEXT PRIMARY KEY,
+      value TEXT
+    );
+  `);
+
   // Idempotent column add: asset_class on accounts ('stocks'|'crypto'|'cash'
   // for investment sub-buckets; NULL elsewhere — NULL investment = stocks).
   const hasAssetClass = db

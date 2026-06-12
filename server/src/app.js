@@ -5,6 +5,7 @@ import healthRouter from './routes/health.js';
 import plaidRouter from './routes/plaid.js';
 import collectiblesRouter from './routes/collectibles.js';
 import networthRouter from './routes/networth.js';
+import spendingRouter from './routes/spending.js';
 
 // Patterns that indicate sensitive data
 const SENSITIVE_PATTERNS = [
@@ -101,6 +102,7 @@ export function createApp() {
   app.use('/api/plaid', plaidRouter);
   app.use('/api', collectiblesRouter);
   app.use('/api', networthRouter);
+  app.use('/api', spendingRouter);
 
   // 404
   app.use((_req, res) => {

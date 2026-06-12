@@ -219,6 +219,81 @@ export function getLastRefresh() {
   return db.prepare(`SELECT * FROM refresh_log ORDER BY ran_at DESC LIMIT 1`).get();
 }
 
+// ─── Meta (key/value) ─────────────────────────────────────────────────────────
+
+export function getMeta(key) {
+  const db = getDb();
+  const row = db.prepare(`SELECT value FROM meta WHERE key = ?`).get(key);
+  return row ? row.value : null;
+}
+
+export function setMeta(key, value) {
+  const db = getDb();
+  db.prepare(`
+    INSERT INTO meta (key, value) VALUES (?, ?)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value
+  `).run(key, value);
+}
+
+// ─── Transactions cache ───────────────────────────────────────────────────────
+
+export function upsertTransaction({ id, accountId, date, name, amountCents, category, pending }) {
+  const db = getDb();
+  db.prepare(`
+    INSERT INTO transactions_cache (id, account_id, date, name, amount_cents, category, pending)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET
+      account_id = excluded.account_id,
+      date = excluded.date,
+      name = excluded.name,
+      amount_cents = excluded.amount_cents,
+      category = excluded.category,
+      pending = excluded.pending
+  `).run(id, accountId, date, name, amountCents, category, pending ? 1 : 0);
+}
+
+/**
+ * Monthly expense/income totals from the transactions cache, oldest→newest.
+ * Expenses: positive amounts on cash/credit accounts; income: negative
+ * amounts on depository ('cash') accounts, sign-flipped. Transfers between
+ * own accounts excluded via primary category TRANSFER_IN / TRANSFER_OUT.
+ */
+export function getSpendingByMonth(sinceDate) {
+  const db = getDb();
+  return db.prepare(`
+    SELECT
+      substr(t.date, 1, 7) AS month,
+      SUM(CASE WHEN t.amount_cents > 0 AND a.type IN ('cash','credit') THEN t.amount_cents ELSE 0 END) AS expenses_cents,
+      SUM(CASE WHEN t.amount_cents < 0 AND a.type = 'cash' THEN -t.amount_cents ELSE 0 END) AS income_cents
+    FROM transactions_cache t
+    JOIN accounts a ON a.id = t.account_id
+    WHERE t.date >= ?
+      AND t.pending = 0
+      AND t.category NOT IN ('TRANSFER_IN', 'TRANSFER_OUT')
+    GROUP BY substr(t.date, 1, 7)
+    ORDER BY month ASC
+  `).all(sinceDate);
+}
+
+/**
+ * Current-month expenses by category, sorted desc. Same exclusions as above.
+ */
+export function getSpendingByCategory(monthPrefix) {
+  const db = getDb();
+  return db.prepare(`
+    SELECT t.category AS category, SUM(t.amount_cents) AS cents
+    FROM transactions_cache t
+    JOIN accounts a ON a.id = t.account_id
+    WHERE substr(t.date, 1, 7) = ?
+      AND t.pending = 0
+      AND t.amount_cents > 0
+      AND a.type IN ('cash','credit')
+      AND t.category NOT IN ('TRANSFER_IN', 'TRANSFER_OUT')
+    GROUP BY t.category
+    ORDER BY cents DESC
+  `).all(monthPrefix);
+}
+
 // ─── Snapshots read ───────────────────────────────────────────────────────────
 
 export function getAllSnapshots() {
