@@ -76,10 +76,29 @@ The dashboard settings panel must display the configured Collectr share link (re
 
 ## Rate limiting: global, not per-route
 
-60 req/min applied globally. The extension popup has minimal API calls; a single user on loopback will never hit this limit during normal use, but it prevents accidental loops or malicious local scripts.
+60 req/min applied globally. The app's windows make minimal API calls; a single user on loopback will never hit this limit during normal use, but it prevents accidental loops or malicious local scripts.
 
 ---
 
 ## `DELETE /api/plaid/items/:id` — Plaid error tolerance
 
 The `/item/remove` Plaid API call is wrapped in a try/catch with a warning log. If Plaid's side fails (e.g., token already invalidated), the local data is still deleted. This ensures "Disconnect & delete" always completes from the user's perspective.
+
+---
+
+## DECISIONS.md location
+
+This file (`server/DECISIONS.md`) is the single decisions log for the whole project, including the Electron app — kept here rather than splitting a second file at the repo root.
+
+---
+
+## Electron app decisions (Phases 6–9)
+
+- **Plain scripts, not ES modules, in renderers.** Renderer windows load `shared/api.js`, `shared/format.js`, and the window script as classic `<script>` tags exposing `window.API` / `window.FMT`. Module scripts over `file://` hit CORS restrictions in Chromium; classic scripts avoid a bundler entirely.
+- **Chart.js bundled locally.** `postinstall` copies `node_modules/chart.js/dist/chart.umd.js` into `app/lib/` (`scripts/copy-chartjs.js`). No CDN for Chart.js.
+- **Plaid Link CDN script in the dashboard window only.** `https://cdn.plaid.com/link/v2/stable/link-initialize.js` is the officially supported way to load Link and is allowed by the dashboard's CSP (`script-src 'self' https://cdn.plaid.com`). The mini window's CSP allows no remote scripts at all. This is an Electron renderer, not a browser extension, so loading Link's loader is permitted by Plaid's terms.
+- **CSP `connect-src http: https:`.** The API base URL is user-configurable (any host/port), so connect-src cannot be pinned to one origin. Default remains loopback.
+- **Packaged server runs via `ELECTRON_RUN_AS_NODE=1`.** The packaged app spawns its own Electron binary as plain Node to run the bundled server from `process.resourcesPath/server` — no second Node runtime is shipped. Server config in packaged mode comes from a dotenv-style `server.env` file in the app's user-data directory, and `DB_PATH` defaults to `<userData>/networth.db`.
+- **Settings & cache as JSON files in userData.** `settings.json` (`apiBaseUrl`) and `cache.json` (stale-while-revalidate response cache) are read/written by the main process; renderers access them only through the preload bridge.
+- **Mini window stale heuristic.** An account is considered stale if its latest snapshot date is before today; the mini window shows one quiet `--warn` line naming the first stale source.
+- **electron / electron-builder versions floated by `npm audit fix`.** electron ^42 and electron-builder ^26 were required to clear high-severity advisories at delivery time.

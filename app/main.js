@@ -120,7 +120,6 @@ function startServer() {
       cwd: serverDir,
       env: { ...process.env },
       stdio: ['ignore', 'pipe', 'pipe'],
-      shell: process.platform === 'win32',
     });
   }
 

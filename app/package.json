@@ -14,8 +14,8 @@
     "chart.js": "^4.5.1"
   },
   "devDependencies": {
-    "electron": "^33.4.11",
-    "electron-builder": "^25.1.8"
+    "electron": "^42.4.0",
+    "electron-builder": "^26.15.2"
   },
   "build": {
     "appId": "com.local.networth-tracker",
@@ -45,8 +45,18 @@
     ],
     "mac": {
       "target": [
-        { "target": "dmg", "arch": ["arm64"] },
-        { "target": "zip", "arch": ["arm64"] }
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "arm64"
+          ]
+        }
       ],
       "category": "public.app-category.finance"
     }
