@@ -1,0 +1,13 @@
+# Secrets
+.env
+
+# Database
+server/data/
+*.db
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
