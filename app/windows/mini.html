@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <!-- CSP: local scripts only. connect-src http(s) because the API base URL
+       is user-configurable; default is loopback. -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src http: https:; img-src 'self' data:;" />
+  <title>Net Worth</title>
+  <link rel="stylesheet" href="../shared/tokens.css" />
+  <link rel="stylesheet" href="mini.css" />
+</head>
+<body>
+  <main class="mini">
+    <header class="mini-header">
+      <span class="eyebrow">Net worth</span>
+      <span class="num small soft" id="mini-time"></span>
+    </header>
+    <p class="stale-line warn num" id="mini-stale"></p>
+
+    <div class="mini-figure num" id="mini-figure"><span class="skeleton">$000,000.00</span></div>
+    <div class="mini-delta num" id="mini-delta"><span class="skeleton">▲ +0.0% past 7 days</span></div>
+
+    <div class="spark-box"><canvas id="sparkline" aria-label="30-day net worth sparkline"></canvas></div>
+
+    <ul class="mini-alloc" id="mini-alloc">
+      <li><span>Investments</span><span class="num" id="alloc-investments">—</span></li>
+      <li><span>Collectibles</span><span class="num" id="alloc-collectibles">—</span></li>
+      <li><span>Cash − Credit</span><span class="num" id="alloc-cashcredit">—</span></li>
+    </ul>
+
+    <footer class="mini-footer">
+      <button class="btn-text" id="mini-refresh">⟳ Refresh</button>
+      <button class="btn-text" id="open-dashboard">Open dashboard</button>
+    </footer>
+  </main>
+
+  <script src="../lib/chart.umd.js"></script>
+  <script src="../shared/format.js"></script>
+  <script src="../shared/api.js"></script>
+  <script src="mini.js"></script>
+</body>
+</html>
