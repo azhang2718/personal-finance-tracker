@@ -3,11 +3,20 @@
 
 html, body { overflow: hidden; }
 
+body { padding: var(--s-2); }
+
+/* Glass card treatment (DESIGN.md Section 1 revision) — CSS-level only */
 .mini {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: calc(100vh - 2 * var(--s-2));
   padding: var(--s-4);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  box-shadow: var(--glass-shadow);
 }
 
 .small { font-size: var(--text-small); }

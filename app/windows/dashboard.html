@@ -12,116 +12,180 @@
   <link rel="stylesheet" href="dashboard.css" />
 </head>
 <body>
-  <main class="page" id="page">
+  <div class="layout">
 
-    <!-- ============ Empty state (fresh install) ============ -->
-    <section id="empty-state" class="empty-state" hidden>
-      <p class="eyebrow">Net worth tracker</p>
-      <p class="empty-line">Connect your first account to start tracking.</p>
-      <button class="btn-primary" id="empty-connect">Connect bank</button>
-      <button class="btn-text" id="empty-manual">Add collectibles manually</button>
-    </section>
+    <!-- ============ Sidebar nav ============ -->
+    <aside class="sidebar glass-card">
+      <p class="eyebrow app-name">Net worth tracker</p>
+      <nav class="side-nav" aria-label="Sections">
+        <button class="nav-btn active" data-tab="summary" aria-current="page">Summary</button>
+        <button class="nav-btn" data-tab="networth">Net worth</button>
+        <button class="nav-btn" data-tab="spending">Spending</button>
+        <button class="nav-btn" data-tab="settings">Settings</button>
+      </nav>
+    </aside>
 
-    <!-- ============ Main dashboard ============ -->
-    <div id="dashboard" hidden>
+    <!-- ============ Content area ============ -->
+    <main class="content" id="page">
 
-      <!-- Header row -->
-      <header class="header-row">
-        <span class="eyebrow">Net worth</span>
-        <span class="header-right">
-          <span id="refreshed-at" class="num soft small"></span>
-          <button class="btn-text" id="refresh-btn">⟳ Refresh</button>
-        </span>
-      </header>
-      <p id="global-error" class="error-line" hidden></p>
-
-      <!-- Hero -->
-      <section class="hero" aria-live="polite">
-        <div class="hero-figure num" id="hero-figure"><span class="skeleton">$000,000.00</span></div>
-        <div class="delta-line" id="delta-line"><span class="skeleton">▲ $0,000.00 (+0.0%) past 7 days</span></div>
+      <!-- Empty state (fresh install) -->
+      <section id="empty-state" class="empty-state" hidden>
+        <p class="eyebrow">Net worth tracker</p>
+        <p class="empty-line">Connect your first account to start tracking.</p>
+        <button class="btn-primary" id="empty-connect">Connect bank</button>
+        <button class="btn-text" id="empty-manual">Add collectibles manually</button>
       </section>
 
-      <!-- Time-series chart, edge to edge -->
-      <section class="chart-wrap">
-        <div class="chart-box"><canvas id="series-chart" aria-label="Net worth over time"></canvas></div>
-        <div class="range-toggles" role="radiogroup" aria-label="Chart range">
-          <button class="range-btn" role="radio" aria-checked="false" data-range="1m">1M</button>
-          <button class="range-btn" role="radio" aria-checked="false" data-range="3m">3M</button>
-          <button class="range-btn" role="radio" aria-checked="false" data-range="1y">1Y</button>
-          <button class="range-btn active" role="radio" aria-checked="true" data-range="all">All</button>
-        </div>
-      </section>
+      <div id="dashboard" hidden>
+        <p id="global-error" class="error-line" hidden></p>
 
-      <!-- Allocation + accounts -->
-      <section class="two-col hairline-top">
-        <div class="col">
-          <h2 class="eyebrow section-label">Allocation</h2>
-          <div class="donut-box"><canvas id="donut-chart" aria-label="Allocation by asset class"></canvas></div>
-          <ul class="legend" id="allocation-legend"></ul>
-          <p class="num small soft" id="credit-offset"></p>
-        </div>
-        <div class="col">
-          <h2 class="eyebrow section-label">Accounts</h2>
-          <table class="accounts-table" id="accounts-table">
-            <tbody id="accounts-tbody"></tbody>
-          </table>
-        </div>
-      </section>
+        <!-- ============ Tab: Summary ============ -->
+        <section class="tab" id="tab-summary">
+          <div class="glass-card hero-card">
+            <div class="hero-card-top">
+              <span class="eyebrow">Total balance</span>
+              <button class="btn-pill" id="refresh-btn">⟳ Refresh</button>
+            </div>
+            <div class="hero-figure num" id="hero-figure" aria-live="polite"><span class="skeleton">$000,000.00</span></div>
+            <div class="delta-line" id="delta-line"><span class="skeleton">▲ $0,000.00 (+0.0%) past 7 days</span></div>
+            <p class="num soft small refreshed-line" id="refreshed-at"></p>
+          </div>
 
-      <!-- Settings -->
-      <section class="settings hairline-top">
-        <h2 class="eyebrow section-label">Settings</h2>
+          <div class="summary-grid">
+            <div class="glass-card spark-card">
+              <span class="eyebrow">Past 30 days</span>
+              <div class="spark-box"><canvas id="summary-spark" aria-label="30-day net worth sparkline"></canvas></div>
+            </div>
+            <div class="glass-card quickstats-card">
+              <span class="eyebrow">This month</span>
+              <div class="quickstat">
+                <span class="soft">Spent</span>
+                <span class="num" id="qs-spend"><span class="skeleton">$0,000.00</span></span>
+              </div>
+              <div class="quickstat">
+                <span class="soft">Income</span>
+                <span class="num" id="qs-income"><span class="skeleton">$0,000.00</span></span>
+              </div>
+            </div>
+          </div>
 
-        <div class="settings-row">
-          <span class="settings-label">Banks</span>
-          <span class="settings-control">
-            <button class="btn-primary" id="connect-bank">Connect bank</button>
-            <span id="item-actions"></span>
-          </span>
-        </div>
+          <div class="glass-card accounts-card">
+            <h2 class="eyebrow section-label">Accounts</h2>
+            <table class="accounts-table" id="accounts-table">
+              <tbody id="accounts-tbody"></tbody>
+            </table>
+          </div>
+        </section>
 
-        <div class="settings-row" id="disconnect-confirm-row" hidden>
-          <span class="settings-label"></span>
-          <span class="settings-control confirm-block">
-            <span id="disconnect-confirm-text"></span>
-            <input type="text" id="disconnect-confirm-input" aria-label="Type institution name to confirm" />
-            <button class="btn-danger" id="disconnect-confirm-btn" disabled>Disconnect &amp; delete</button>
-            <button class="btn-text" id="disconnect-cancel-btn">Cancel</button>
-          </span>
-        </div>
+        <!-- ============ Tab: Net worth ============ -->
+        <section class="tab" id="tab-networth" hidden>
+          <div class="glass-card nw-card">
+            <div class="hero-card-top">
+              <span class="eyebrow">Net worth</span>
+            </div>
+            <div class="hero-figure num" id="nw-figure"><span class="skeleton">$000,000.00</span></div>
+            <div class="delta-line" id="nw-delta-line"><span class="skeleton">▲ $0,000.00 (+0.0%) past 7 days</span></div>
+            <div class="chart-box"><canvas id="series-chart" aria-label="Net worth over time"></canvas></div>
+            <div class="range-toggles" role="radiogroup" aria-label="Chart range">
+              <button class="range-btn" role="radio" aria-checked="false" data-range="1m">1M</button>
+              <button class="range-btn" role="radio" aria-checked="false" data-range="3m">3M</button>
+              <button class="range-btn" role="radio" aria-checked="false" data-range="1y">1Y</button>
+              <button class="range-btn active" role="radio" aria-checked="true" data-range="all">All</button>
+            </div>
+          </div>
 
-        <div class="settings-row">
-          <span class="settings-label">Collectibles share link</span>
-          <span class="settings-control num small" id="collectr-url">—</span>
-        </div>
+          <div class="glass-card allocation-card">
+            <h2 class="eyebrow section-label">Allocation</h2>
+            <div class="alloc-flex">
+              <div class="donut-box"><canvas id="donut-chart" aria-label="Allocation by asset class"></canvas></div>
+              <div class="alloc-right">
+                <ul class="legend" id="allocation-legend"></ul>
+                <p class="num small soft" id="credit-offset"></p>
+              </div>
+            </div>
+          </div>
+        </section>
 
-        <div class="settings-row">
-          <label class="settings-label" for="manual-collectibles">Collectibles value</label>
-          <span class="settings-control">
-            <input type="number" id="manual-collectibles" min="0" step="0.01" placeholder="0.00" />
-            <button class="btn-text" id="manual-save">Save</button>
-            <span class="small soft" id="manual-status"></span>
-          </span>
-        </div>
+        <!-- ============ Tab: Spending ============ -->
+        <section class="tab" id="tab-spending" hidden>
+          <div class="glass-card spending-chart-card">
+            <h2 class="eyebrow section-label">Monthly expenses</h2>
+            <div class="bar-box"><canvas id="spending-chart" aria-label="Monthly expenses and income, last 6 months"></canvas></div>
+          </div>
 
-        <div class="settings-row">
-          <span class="settings-label">Data</span>
-          <span class="settings-control">
-            <button class="btn-text" id="export-csv">Export CSV</button>
-          </span>
-        </div>
+          <div class="spending-grid">
+            <div class="glass-card month-card">
+              <span class="eyebrow">This month</span>
+              <div class="month-figure num" id="spend-month-figure"><span class="skeleton">$0,000.00</span></div>
+              <p class="soft small">spent so far</p>
+              <p class="num" id="spend-month-income"><span class="skeleton">$0,000.00 income</span></p>
+            </div>
+            <div class="glass-card categories-card">
+              <h2 class="eyebrow section-label">By category</h2>
+              <ul class="category-list" id="category-list"></ul>
+            </div>
+          </div>
+        </section>
 
-        <div class="settings-row">
-          <label class="settings-label" for="api-base-url">API base URL</label>
-          <span class="settings-control">
-            <input type="url" id="api-base-url" spellcheck="false" />
-            <button class="btn-text" id="api-base-save">Save</button>
-            <span class="small soft" id="api-base-status"></span>
-          </span>
-        </div>
-      </section>
-    </div>
-  </main>
+        <!-- ============ Tab: Settings ============ -->
+        <section class="tab" id="tab-settings" hidden>
+          <div class="glass-card settings-card">
+            <h2 class="eyebrow section-label">Connections</h2>
+            <div class="settings-row">
+              <span class="settings-label">Banks</span>
+              <span class="settings-control">
+                <button class="btn-primary" id="connect-bank">Connect bank</button>
+                <span id="item-actions"></span>
+              </span>
+            </div>
+            <div class="settings-row" id="disconnect-confirm-row" hidden>
+              <span class="settings-label"></span>
+              <span class="settings-control confirm-block">
+                <span id="disconnect-confirm-text"></span>
+                <input type="text" id="disconnect-confirm-input" aria-label="Type institution name to confirm" />
+                <button class="btn-danger" id="disconnect-confirm-btn" disabled>Disconnect &amp; delete</button>
+                <button class="btn-text" id="disconnect-cancel-btn">Cancel</button>
+              </span>
+            </div>
+          </div>
+
+          <div class="glass-card settings-card">
+            <h2 class="eyebrow section-label">Collectibles</h2>
+            <div class="settings-row">
+              <span class="settings-label">Collectibles share link</span>
+              <span class="settings-control num small" id="collectr-url">—</span>
+            </div>
+            <div class="settings-row">
+              <label class="settings-label" for="manual-collectibles">Collectibles value</label>
+              <span class="settings-control">
+                <input type="number" id="manual-collectibles" min="0" step="0.01" placeholder="0.00" />
+                <button class="btn-text" id="manual-save">Save</button>
+                <span class="small soft" id="manual-status"></span>
+              </span>
+            </div>
+          </div>
+
+          <div class="glass-card settings-card">
+            <h2 class="eyebrow section-label">Data</h2>
+            <div class="settings-row">
+              <span class="settings-label">Export</span>
+              <span class="settings-control">
+                <button class="btn-pill" id="export-csv">Export CSV</button>
+              </span>
+            </div>
+            <div class="settings-row">
+              <label class="settings-label" for="api-base-url">API base URL</label>
+              <span class="settings-control">
+                <input type="url" id="api-base-url" spellcheck="false" />
+                <button class="btn-text" id="api-base-save">Save</button>
+                <span class="small soft" id="api-base-status"></span>
+              </span>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
 
   <script src="../lib/chart.umd.js"></script>
   <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>

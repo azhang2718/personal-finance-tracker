@@ -70,3 +70,21 @@
   failures are logged and skipped; cached rows keep serving.
 - **Income definition.** Negative amounts (money in) on depository accounts
   only — credit-card refunds are not income.
+
+## Glass UI redesign (2026-06-12)
+
+- **Layout.** Left glass sidebar (~220px, sticky) with four client-side tabs
+  (Summary default / Net worth / Spending / Settings); show/hide sections,
+  no routing. Empty state replaces the content area; the sidebar stays.
+- **Series chart deferral.** The full time-series chart lives in the hidden
+  Net worth tab; Chart.js in a zero-size canvas breaks, so its first render
+  (and the one orchestrated draw-in) is deferred until the tab is first
+  shown. Other charts get a `resize()` nudge on tab switch.
+- **Both heroes share data.** `/api/networth/current` fills the Summary
+  "Total balance" hero (delta as a glass chip) and the Net worth tab figure
+  (delta as a plain line) from one render call.
+- **Spending UI.** Bar chart = expenses (accent, rounded tops) + income
+  (muted grey bars) per month; categories prettified from Plaid's
+  SNAKE_CASE primaries, top 8 + aggregated "Other".
+- **Mini window** got only a CSS-level glass treatment (body gradient from
+  tokens + the .mini container as one glass card); mini.js untouched.

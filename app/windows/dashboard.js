@@ -8,6 +8,8 @@
 
   let seriesChart = null;
   let donutChart = null;
+  let sparkChart = null;
+  let spendingChart = null;
   let currentRange = 'all';
   let firstChartRender = true; // draw-in happens once, on load
   let latestAccounts = [];
@@ -46,16 +48,11 @@
   // Hero + delta
   // ---------------------------------------------------------------
 
-  function renderCurrent(data, meta) {
-    const hero = $('hero-figure');
-    const total = data.total_cents;
-    // Drop cents when at/above $100k for width, per spec
-    hero.textContent = FMT.dollars(total, { dropCents: Math.abs(total) >= 100000 * 100 });
-
-    const delta = data.delta_7d_cents;
-    const pctNum = Number(data.delta_7d_pct);
-    const line = $('delta-line');
-    line.innerHTML = '';
+  // Fills a delta line element; `asChip` wraps it in a glass pill (summary hero).
+  function fillDelta(el, delta, pctNum, asChip) {
+    el.innerHTML = '';
+    const wrap = asChip ? document.createElement('span') : el;
+    if (asChip) wrap.className = 'delta-chip';
     const arrowSpan = document.createElement('span');
     arrowSpan.className = 'num ' + (delta >= 0 ? 'pos' : 'neg');
     const arrow = delta >= 0 ? '▲' : '▼';
@@ -64,8 +61,22 @@
     const words = document.createElement('span');
     words.className = 'soft-words';
     words.textContent = ' past 7 days';
-    line.appendChild(arrowSpan);
-    line.appendChild(words);
+    wrap.appendChild(arrowSpan);
+    wrap.appendChild(words);
+    if (asChip) el.appendChild(wrap);
+  }
+
+  function renderCurrent(data, meta) {
+    const total = data.total_cents;
+    // Drop cents when at/above $100k for width, per spec
+    const figure = FMT.dollars(total, { dropCents: Math.abs(total) >= 100000 * 100 });
+    $('hero-figure').textContent = figure; // Summary hero
+    $('nw-figure').textContent = figure;   // Net worth tab hero
+
+    const delta = data.delta_7d_cents;
+    const pctNum = Number(data.delta_7d_pct);
+    fillDelta($('delta-line'), delta, pctNum, true);
+    fillDelta($('nw-delta-line'), delta, pctNum, false);
 
     if (data.last_refresh) {
       const staleSuffix = meta && meta.fromCache ? ' · cached' : '';
@@ -114,7 +125,16 @@
     };
   }
 
+  // The Net worth tab is hidden on load; creating a Chart.js chart in a
+  // hidden (zero-size) canvas breaks layout and wastes the draw-in moment.
+  // Defer first creation until the tab is shown.
+  let pendingSeriesPayload = null;
+
   function renderSeries(payload) {
+    if (!seriesChart && $('tab-networth').hidden) {
+      pendingSeriesPayload = payload;
+      return;
+    }
     const series = payload.series || [];
     const labels = series.map((p) => p.date);
     const values = series.map((p) => p.total_cents / 100);
@@ -201,6 +221,164 @@
   }
 
   // ---------------------------------------------------------------
+  // Summary sparkline (compact 30-day net worth, no axes)
+  // ---------------------------------------------------------------
+
+  function renderSpark(payload) {
+    const series = payload.series || [];
+    const config = {
+      type: 'line',
+      data: {
+        labels: series.map((p) => p.date),
+        datasets: [{
+          data: series.map((p) => p.total_cents / 100),
+          borderColor: cssVar('--accent'),
+          borderWidth: 1.5,
+          backgroundColor: 'rgba(74, 144, 217, 0.10)',
+          fill: true,
+          pointRadius: 0,
+          tension: 0.2,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: reducedMotion ? false : undefined,
+        plugins: { legend: { display: false }, tooltip: { enabled: false } },
+        scales: { x: { display: false }, y: { display: false } },
+      },
+    };
+    if (sparkChart) {
+      sparkChart.data = config.data;
+      sparkChart.update('none');
+    } else {
+      sparkChart = new Chart($('summary-spark'), config);
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // Spending tab + summary quick stats
+  // ---------------------------------------------------------------
+
+  function monthLabel(ym) {
+    const d = new Date(ym + '-01T00:00:00');
+    return isNaN(d.getTime()) ? ym : d.toLocaleDateString('en-US', { month: 'short' });
+  }
+
+  function renderSpending(data) {
+    const months = data.months || [];
+    const cur = data.current_month || { expenses_cents: 0, income_cents: 0, by_category: [] };
+
+    // Quick stats on the Summary tab
+    $('qs-spend').textContent = FMT.dollars(cur.expenses_cents);
+    $('qs-income').textContent = FMT.dollars(cur.income_cents);
+
+    // Current-month card
+    $('spend-month-figure').textContent = FMT.dollars(cur.expenses_cents);
+    $('spend-month-income').textContent = `${FMT.dollars(cur.income_cents)} income`;
+
+    // Category breakdown: top 8 + Other
+    const list = $('category-list');
+    list.innerHTML = '';
+    const cats = cur.by_category || [];
+    const top = cats.slice(0, 8);
+    const otherCents = cats.slice(8).reduce((a, c) => a + c.cents, 0);
+    const prettify = (c) =>
+      String(c).replace(/_/g, ' ').toLowerCase().replace(/^./, (ch) => ch.toUpperCase());
+    const rows = top.map((c) => ({ label: prettify(c.category), cents: c.cents }));
+    if (otherCents > 0) rows.push({ label: 'Other', cents: otherCents });
+    if (rows.length === 0) {
+      const li = document.createElement('li');
+      li.innerHTML = '<span class="soft">No spending recorded this month.</span>';
+      list.appendChild(li);
+    }
+    for (const r of rows) {
+      const li = document.createElement('li');
+      const name = document.createElement('span');
+      name.textContent = r.label;
+      const amt = document.createElement('span');
+      amt.className = 'cat-amount';
+      amt.textContent = FMT.dollars(r.cents);
+      li.appendChild(name);
+      li.appendChild(amt);
+      list.appendChild(li);
+    }
+
+    // Bar chart: expenses (accent, rounded tops) + income (muted)
+    const inkSoft = cssVar('--ink-soft');
+    const mono = cssVar('--font-mono');
+    const config = {
+      type: 'bar',
+      data: {
+        labels: months.map((m) => monthLabel(m.month)),
+        datasets: [
+          {
+            label: 'Expenses',
+            data: months.map((m) => m.expenses_cents / 100),
+            backgroundColor: cssVar('--accent'),
+            borderRadius: { topLeft: 6, topRight: 6 },
+            borderSkipped: 'bottom',
+            maxBarThickness: 36,
+          },
+          {
+            label: 'Income',
+            data: months.map((m) => m.income_cents / 100),
+            backgroundColor: 'rgba(107, 118, 137, 0.35)',
+            borderRadius: { topLeft: 6, topRight: 6 },
+            borderSkipped: 'bottom',
+            maxBarThickness: 36,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: reducedMotion ? false : undefined,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: cssVar('--bg-raised'),
+            borderColor: cssVar('--hairline'),
+            borderWidth: 1,
+            titleColor: cssVar('--ink'),
+            bodyColor: cssVar('--ink'),
+            titleFont: { family: mono, size: 12 },
+            bodyFont: { family: mono, size: 12 },
+            displayColors: false,
+            callbacks: {
+              label: (item) => `${item.dataset.label} ${FMT.dollars(Math.round(item.parsed.y * 100))}`,
+            },
+          },
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            border: { display: false },
+            ticks: { color: inkSoft, font: { family: mono, size: 11 } },
+          },
+          y: {
+            grid: { color: cssVar('--hairline'), drawTicks: false },
+            border: { display: false },
+            beginAtZero: true,
+            ticks: {
+              color: inkSoft,
+              font: { family: mono, size: 11 },
+              maxTicksLimit: 4,
+              callback: (v) => '$' + Number(v).toLocaleString('en-US', { maximumFractionDigits: 0 }),
+            },
+          },
+        },
+      },
+    };
+    if (spendingChart) {
+      spendingChart.data = config.data;
+      spendingChart.update('none');
+    } else {
+      spendingChart = new Chart($('spending-chart'), config);
+    }
+  }
+
+  // ---------------------------------------------------------------
   // Allocation donut + legend (credit is an offset line, not a slice)
   // ---------------------------------------------------------------
 
@@ -216,10 +394,10 @@
 
     const slices = [
       { label: 'Stocks', value: stocks, color: cssVar('--accent') },
-      { label: 'Crypto', value: crypto, color: 'rgba(26, 26, 26, 0.45)' },
-      { label: 'Collectibles', value: collectibles, color: 'rgba(26, 26, 26, 0.7)' },
+      { label: 'Crypto', value: crypto, color: 'rgba(29, 36, 51, 0.45)' },
+      { label: 'Collectibles', value: collectibles, color: 'rgba(29, 36, 51, 0.7)' },
       { label: 'Cash', value: cash, color: cssVar('--ink-soft') },
-      { label: 'Fidelity cash', value: invCash, color: 'rgba(26, 26, 26, 0.25)' },
+      { label: 'Fidelity cash', value: invCash, color: 'rgba(29, 36, 51, 0.25)' },
     ].filter((s) => s.value > 0);
 
     const positiveTotal = slices.reduce((a, s) => a + s.value, 0);
@@ -337,6 +515,34 @@
   function toggleEmptyState(isEmpty) {
     $('empty-state').hidden = !isEmpty;
     $('dashboard').hidden = isEmpty;
+  }
+
+  // ---------------------------------------------------------------
+  // Sidebar tabs (client-side show/hide; Summary is the default)
+  // ---------------------------------------------------------------
+
+  const TAB_IDS = ['summary', 'networth', 'spending', 'settings'];
+
+  function setActiveTab(tab) {
+    for (const id of TAB_IDS) {
+      $(`tab-${id}`).hidden = id !== tab;
+    }
+    document.querySelectorAll('.nav-btn').forEach((btn) => {
+      const active = btn.dataset.tab === tab;
+      btn.classList.toggle('active', active);
+      if (active) btn.setAttribute('aria-current', 'page');
+      else btn.removeAttribute('aria-current');
+    });
+    // Deferred first render of the series chart (keeps the draw-in moment).
+    if (tab === 'networth' && pendingSeriesPayload) {
+      const p = pendingSeriesPayload;
+      pendingSeriesPayload = null;
+      renderSeries(p);
+    }
+    // Chart.js canvases in previously-hidden sections need a resize nudge.
+    for (const c of [seriesChart, donutChart, sparkChart, spendingChart]) {
+      if (c) c.resize();
+    }
   }
 
   // ---------------------------------------------------------------
@@ -552,7 +758,9 @@
     await Promise.all([
       API.getSWR('/api/networth/current', renderCurrent, onNetError),
       API.getSWR(`/api/networth/series?range=${currentRange}`, renderSeries, onNetError),
+      API.getSWR('/api/networth/series?range=1m', renderSpark, () => {}),
       API.getSWR('/api/accounts', renderAccounts, onNetError),
+      API.getSWR('/api/spending/summary?months=6', renderSpending, () => {}),
     ]);
 
     if (networkFailed) {
@@ -585,8 +793,14 @@
     $('empty-connect').addEventListener('click', connectBank);
     $('empty-manual').addEventListener('click', () => {
       toggleEmptyState(false);
+      setActiveTab('settings');
       $('manual-collectibles').focus();
       $('manual-collectibles').scrollIntoView({ block: 'center' });
+    });
+
+    // Sidebar tabs
+    document.querySelectorAll('.nav-btn').forEach((btn) => {
+      btn.addEventListener('click', () => setActiveTab(btn.dataset.tab));
     });
     $('export-csv').addEventListener('click', exportCsv);
     $('manual-save').addEventListener('click', saveManualCollectibles);

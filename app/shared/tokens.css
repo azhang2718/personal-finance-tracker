@@ -1,17 +1,26 @@
-/* Design tokens — source of truth per DESIGN.md Section 2.
+/* Design tokens — source of truth per DESIGN.md Section 2 (glass revision).
    Shared by the mini window and the dashboard window. */
 :root {
-  /* Color */
-  --bg:            #FAF9F6;  /* warm off-white, page background */
-  --bg-raised:     #FFFFFF;  /* settings panel, table rows on hover */
-  --ink:           #1A1A1A;  /* primary text */
-  --ink-soft:      #6B6B66;  /* secondary text, labels, axes */
-  --hairline:      #E4E1DA;  /* all borders and dividers, 1px only */
+  /* Color — blue-white glass palette */
+  --bg-grad-from:  #EEF3F9;  /* page gradient start */
+  --bg-grad-to:    #DFE9F5;  /* page gradient end */
+  --bg:            #EEF3F9;  /* flat fallback */
+  --bg-raised:     rgba(255, 255, 255, 0.8); /* tooltips, inputs, row hover */
+  --ink:           #1D2433;  /* primary text */
+  --ink-soft:      #6B7689;  /* secondary text, labels, axes */
+  --hairline:      rgba(120, 150, 190, 0.18); /* borders and dividers, 1px */
   --accent:        #4A90D9;  /* sky blue: chart line, primary actions, focus */
-  --accent-soft:   #4A90D91A; /* 10% accent: chart area fill */
+  --accent-soft:   #4A90D91A; /* 10% accent: chart area fill, active nav pill */
   --pos:           #4C7A5A;  /* desaturated green, change indicators only */
   --neg:           #B05A52;  /* desaturated red, change indicators only */
   --warn:          #A8842F;  /* stale badges */
+
+  /* Glass cards */
+  --glass-bg:        rgba(255, 255, 255, 0.55);
+  --glass-bg-hover:  rgba(255, 255, 255, 0.68);
+  --glass-border:    rgba(255, 255, 255, 0.7);
+  --glass-blur:      18px;
+  --glass-shadow:    0 8px 24px rgba(70, 100, 150, 0.08);
 
   /* Type */
   --font-ui:   "Geist", system-ui, sans-serif;
@@ -27,7 +36,8 @@
   --s-1: 4px;  --s-2: 8px;  --s-3: 16px;  --s-4: 24px;
   --s-5: 40px; --s-6: 64px;
 
-  --radius: 2px;          /* near-square; this is editorial, not bubbly */
+  --radius: 18px;        /* glass card corner radius */
+  --radius-sm: 10px;     /* inputs, small controls */
   --focus-ring: 2px solid var(--accent);
 }
 
@@ -37,7 +47,8 @@
 html, body {
   margin: 0;
   padding: 0;
-  background: var(--bg);
+  background: linear-gradient(160deg, var(--bg-grad-from), var(--bg-grad-to)) fixed;
+  background-color: var(--bg);
   color: var(--ink);
   font-family: var(--font-ui);
   font-size: 16px;
@@ -52,6 +63,17 @@ body { font-size: var(--text-body); }
   font-variant-numeric: tabular-nums;
 }
 
+/* Frosted glass card */
+.glass-card {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  box-shadow: var(--glass-shadow);
+}
+.glass-card:hover { background: var(--glass-bg-hover); }
+
 /* Eyebrow labels: letterspaced uppercase small caps */
 .eyebrow {
   font-family: var(--font-ui);
@@ -62,21 +84,36 @@ body { font-size: var(--text-body); }
   color: var(--ink-soft);
 }
 
-/* Buttons */
+/* Buttons — pills */
 button {
   font: inherit;
   cursor: pointer;
-  border-radius: var(--radius);
+  border-radius: 999px;
 }
 
 .btn-primary {
   background: var(--accent);
   color: #fff;
   border: none;
-  padding: var(--s-2) var(--s-3);
+  border-radius: 999px;
+  padding: var(--s-2) var(--s-4);
   font-weight: 500;
 }
 .btn-primary:disabled { opacity: 0.6; cursor: default; }
+
+/* Secondary: glass pill */
+.btn-pill {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  padding: var(--s-2) var(--s-4);
+  color: var(--ink);
+  font-weight: 500;
+}
+.btn-pill:hover { background: var(--glass-bg-hover); }
+.btn-pill:disabled { color: var(--ink-soft); cursor: default; }
 
 .btn-text {
   background: none;
@@ -110,8 +147,8 @@ input[type="url"] {
   font-variant-numeric: tabular-nums;
   background: var(--bg-raised);
   border: 1px solid var(--hairline);
-  border-radius: var(--radius);
-  padding: var(--s-2);
+  border-radius: var(--radius-sm);
+  padding: var(--s-2) var(--s-3);
   color: var(--ink);
 }
 
@@ -135,8 +172,8 @@ input[type="url"] {
 
 /* Loading skeletons — hairline-colored bars with subtle pulse, never spinners */
 .skeleton {
-  background: var(--hairline);
-  border-radius: var(--radius);
+  background: rgba(120, 150, 190, 0.16);
+  border-radius: var(--radius-sm);
   animation: skeleton-pulse 1.4s ease-in-out infinite;
   color: transparent !important;
   user-select: none;

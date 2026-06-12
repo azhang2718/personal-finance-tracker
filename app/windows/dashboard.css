@@ -1,13 +1,65 @@
-/* Dashboard layout — DESIGN.md Section 3.
-   12-column grid feel via max-width 1080px, hairline dividers, no boxes. */
+/* Dashboard — DESIGN.md Sections 1 & 3 (glass revision).
+   Left sidebar + tabbed content area, frosted-glass cards. */
 
-.page {
-  max-width: 1080px;
+.layout {
+  display: flex;
+  gap: var(--s-4);
+  max-width: 1240px;
   margin: 0 auto;
-  padding: var(--s-5);
+  padding: var(--s-4);
+  min-height: 100vh;
+  align-items: flex-start;
 }
 
 .small { font-size: var(--text-small); }
+
+/* ---- Sidebar ---- */
+.sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  padding: var(--s-4) var(--s-3);
+  position: sticky;
+  top: var(--s-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+}
+.app-name { margin: 0 0 0 var(--s-2); }
+
+.side-nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+}
+.nav-btn {
+  background: none;
+  border: none;
+  border-radius: 999px;
+  text-align: left;
+  padding: var(--s-2) var(--s-3);
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+.nav-btn:hover { background: var(--glass-bg-hover); color: var(--ink); }
+.nav-btn.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* ---- Content ---- */
+.content {
+  flex: 1;
+  min-width: 0;
+}
+.tab {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+}
+
+.glass-card { padding: var(--s-4); }
+
+.section-label { margin: 0 0 var(--s-3); }
 
 /* ---- Empty state ---- */
 .empty-state {
@@ -21,15 +73,6 @@
 }
 .empty-line { font-size: var(--text-h1); margin: 0; }
 
-/* ---- Header row ---- */
-.header-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  margin-bottom: var(--s-4);
-}
-.header-right { display: inline-flex; align-items: baseline; gap: var(--s-3); }
-
 .error-line {
   color: var(--neg);
   font-size: var(--text-body);
@@ -37,8 +80,13 @@
 }
 .error-line .btn-text { padding-left: var(--s-2); }
 
-/* ---- Hero ---- */
-.hero { margin-bottom: var(--s-4); }
+/* ---- Hero cards (summary + net worth) ---- */
+.hero-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--s-3);
+}
 .hero-figure {
   font-size: var(--text-hero);
   font-weight: 500;
@@ -49,18 +97,45 @@
 .delta-line {
   font-size: var(--text-body);
   margin-top: var(--s-2);
-  min-height: 1.4em;
+  min-height: 1.8em;
 }
 .delta-line .soft-words { color: var(--ink-soft); }
-
-/* ---- Chart ---- */
-.chart-wrap {
-  /* edge-to-edge within content width */
-  margin: 0 0 var(--s-5);
+.delta-chip {
+  display: inline-block;
+  padding: 2px var(--s-3);
+  border-radius: 999px;
+  background: var(--bg-raised);
+  border: 1px solid var(--hairline);
 }
+.refreshed-line { margin: var(--s-2) 0 0; min-height: 1.2em; }
+
+/* ---- Summary grid ---- */
+.summary-grid {
+  display: grid;
+  grid-template-columns: 7fr 5fr;
+  gap: var(--s-4);
+}
+.spark-box {
+  position: relative;
+  height: 120px;
+  margin-top: var(--s-3);
+}
+.quickstats-card .quickstat {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: var(--s-3) 0;
+  border-bottom: 1px solid var(--hairline);
+  font-size: 1.1rem;
+}
+.quickstats-card .quickstat:last-child { border-bottom: none; }
+.quickstats-card .eyebrow { display: block; margin-bottom: var(--s-2); }
+
+/* ---- Net worth tab ---- */
 .chart-box {
   position: relative;
   height: 300px;
+  margin-top: var(--s-4);
 }
 .range-toggles {
   display: flex;
@@ -83,21 +158,18 @@
   border-bottom-color: var(--accent);
 }
 
-/* ---- Two-column: allocation + accounts ---- */
-.two-col {
-  display: grid;
-  grid-template-columns: 5fr 7fr;
-  gap: var(--s-6);
-  padding: var(--s-5) 0;
+.alloc-flex {
+  display: flex;
+  gap: var(--s-5);
+  align-items: flex-start;
+  flex-wrap: wrap;
 }
-.section-label { margin: 0 0 var(--s-4); }
-
 .donut-box {
   position: relative;
   height: 180px;
   width: 180px;
-  margin-bottom: var(--s-4);
 }
+.alloc-right { flex: 1; min-width: 260px; }
 
 .legend {
   list-style: none;
@@ -114,6 +186,7 @@
 .legend .swatch {
   width: 8px;
   height: 8px;
+  border-radius: 2px;
   display: inline-block;
   align-self: center;
 }
@@ -125,6 +198,43 @@
 }
 #credit-offset { margin-top: var(--s-3); }
 
+/* ---- Spending tab ---- */
+.bar-box {
+  position: relative;
+  height: 260px;
+}
+.spending-grid {
+  display: grid;
+  grid-template-columns: 5fr 7fr;
+  gap: var(--s-4);
+}
+.month-figure {
+  font-size: 2.25rem;
+  font-weight: 500;
+  line-height: 1.15;
+  margin-top: var(--s-3);
+  min-height: 1.2em;
+}
+.month-card p { margin: var(--s-1) 0 0; }
+
+.category-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.category-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: var(--s-2) 0;
+  border-bottom: 1px solid var(--hairline);
+}
+.category-list li:last-child { border-bottom: none; }
+.category-list .cat-amount {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
 /* ---- Accounts table ---- */
 .accounts-table {
   width: 100%;
@@ -133,6 +243,7 @@
 .accounts-table tr {
   border-bottom: 1px solid var(--hairline);
 }
+.accounts-table tr:last-child { border-bottom: none; }
 .accounts-table tr:hover { background: var(--bg-raised); }
 .accounts-table td {
   padding: var(--s-3) var(--s-2) var(--s-3) 0;
@@ -161,7 +272,6 @@
 .acct-status .dot { margin-right: var(--s-1); }
 
 /* ---- Settings ---- */
-.settings { padding: var(--s-5) 0; }
 .settings-row {
   display: grid;
   grid-template-columns: 220px 1fr;

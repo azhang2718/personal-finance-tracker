@@ -2,11 +2,16 @@
 
 Companion to `networth-tracker-requirements.md` (Section 6) and `implementation-pipeline.md` (Phases 7–8). This document is the source of truth for all visual decisions. Where code and this spec disagree, this spec wins.
 
-## 1. Design intent
+## 1. Design intent (revised 2026-06-12)
 
-A precision instrument for reading numbers, in the owner's existing Swiss/editorial design language: disciplined grid, generous whitespace, typography carrying the personality. The single memorable element is the **hero**: an oversized monospaced net worth figure with the time-series chart running edge-to-edge directly beneath it, axes set like footnotes. Everything else stays quiet.
+A modern glass fintech dashboard in a **blue-white tone**: soft blue-grey gradient page background, content in **frosted-glass cards** (translucent white, backdrop blur, 1px soft white/blue borders, generous corner radius, soft diffuse shadows). Typography still carries the numbers: Geist Sans for UI, Geist Mono with tabular figures for every numeral. The dashboard is organized as a **left-sidebar tabbed layout** (FundFlow-style):
 
-Explicitly avoid: gradients, glassmorphism, card shadows, rounded "fintech app" pills, emoji, decorative icons, dark-mode-with-neon-accent defaults. Restraint is the style.
+1. **Summary** — default tab on open: total balance hero card, compact net-worth sparkline, accounts list card, latest refresh status.
+2. **Net worth** — oversized net worth figure, full time-series chart with range toggles, allocation donut with stocks/crypto/cash split.
+3. **Spending** — monthly expense statistics: month-over-month bar chart, current-month total spend and income, category breakdown list.
+4. **Settings** — connections (connect/reconnect/disconnect), Collectr link, manual entry, CSV export, API base URL.
+
+Restraint still applies to color: one blue accent family, desaturated green/red only on change indicators. No neon, no emoji, no heavy drop shadows — the glass should feel airy, not loud.
 
 ## 2. Design tokens
 
@@ -14,17 +19,25 @@ Implement as CSS custom properties on `:root` in a shared `tokens.css` used by b
 
 ```css
 :root {
-  /* Color */
-  --bg:            #FAF9F6;  /* warm off-white, page background */
-  --bg-raised:     #FFFFFF;  /* settings panel, table rows on hover */
-  --ink:           #1A1A1A;  /* primary text */
-  --ink-soft:      #6B6B66;  /* secondary text, labels, axes */
-  --hairline:      #E4E1DA;  /* all borders and dividers, 1px only */
+  /* Color — blue-white glass palette */
+  --bg-grad-from:  #EEF3F9;  /* page gradient start (160deg) */
+  --bg-grad-to:    #DFE9F5;  /* page gradient end */
+  --bg-raised:     rgba(255,255,255,0.8); /* tooltips, inputs, row hover */
+  --ink:           #1D2433;  /* primary text */
+  --ink-soft:      #6B7689;  /* secondary text, labels, axes */
+  --hairline:      rgba(120,150,190,0.18); /* borders and dividers, 1px only */
   --accent:        #4A90D9;  /* sky blue: chart line, primary actions, focus */
-  --accent-soft:   #4A90D91A; /* 10% accent: chart area fill */
+  --accent-soft:   #4A90D91A; /* 10% accent: chart area fill, active nav pill */
   --pos:           #4C7A5A;  /* desaturated green, change indicators only */
   --neg:           #B05A52;  /* desaturated red, change indicators only */
   --warn:          #A8842F;  /* stale badges */
+
+  /* Glass cards */
+  --glass-bg:       rgba(255,255,255,0.55);
+  --glass-bg-hover: rgba(255,255,255,0.68);
+  --glass-border:   rgba(255,255,255,0.7);
+  --glass-blur:     18px;
+  --glass-shadow:   0 8px 24px rgba(70,100,150,0.08);
 
   /* Type */
   --font-ui:   "Geist", system-ui, sans-serif;
@@ -40,10 +53,15 @@ Implement as CSS custom properties on `:root` in a shared `tokens.css` used by b
   --s-1: 4px;  --s-2: 8px;  --s-3: 16px;  --s-4: 24px;
   --s-5: 40px; --s-6: 64px;
 
-  --radius: 2px;          /* near-square; this is editorial, not bubbly */
+  --radius: 18px;        /* glass card corner radius */
+  --radius-sm: 10px;     /* inputs, small controls */
   --focus-ring: 2px solid var(--accent);
 }
 ```
+
+A frosted-glass card is `--glass-bg` + `backdrop-filter: blur(var(--glass-blur))`
+(+ `-webkit-` prefix) + 1px `--glass-border` + `--radius` + `--glass-shadow`;
+hover raises opacity to `--glass-bg-hover`.
 
 **Typography rules**
 - Every numeral in the product — balances, deltas, dates, axis labels, table figures — is set in `--font-mono` with `font-variant-numeric: tabular-nums`.
@@ -52,54 +70,44 @@ Implement as CSS custom properties on `:root` in a shared `tokens.css` used by b
 
 ## 3. Dashboard layout
 
-12-column grid, max-width 1080px, centered, `--s-5` outer padding. Hairline dividers between sections; no boxes around sections.
+Fixed left sidebar (~220px, glass panel) + content area, max-width 1240px overall, `--s-4` outer padding and gaps. Every content block is a frosted-glass card; tabs are sections within the same page, shown/hidden client-side. Default tab on open: **Summary**.
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│ NET WORTH                         refreshed 9:41 AM  ⟳ Refresh│  header row
-│                                                              │
-│ $128,442.18                                                  │  hero figure (mono)
-│ ▲ $1,204.55 (+0.9%) past 7 days                              │  delta line
-│                                                              │
-│ ┌─ time-series chart, full content width ────────────────┐  │
-│ │                                            ╱─╲           │  │
-│ │                                   ╱──╲ ╱──╱   ╲──        │  │
-│ │                          ╱───────╱    ╳                  │  │
-│ │  ──╲   ╱────╲   ╱───────╱                                │  │
-│ └──────────────────────────────────────────────────────────┘  │
-│   1M   3M   1Y   All                                          │  range toggles
-├──────────────────────────────────────────────────────────────┤
-│ ALLOCATION                    │ ACCOUNTS                      │
-│                               │ Chase Checking   cash         │
-│      ◐ donut                  │   $4,212.10      ok · 9:41 AM │
-│                               │ Chase Freedom    credit       │
-│  ● Investments  61.2%  $78.6k │   −$842.33       ok · 9:41 AM │
-│  ● Cash          3.3%   $4.2k │ Fidelity         investment   │
-│  ● Collectibles 36.1%  $46.4k │   $78,640.00     ok · 9:41 AM │
-│  (credit shown as offset)     │ Collectr         collectibles │
-│                               │   $46,432.41     stale · Jun 9│
-├──────────────────────────────────────────────────────────────┤
-│ SETTINGS                                                      │
-│ Connect bank · Reconnect · Disconnect & delete                │
-│ Collectibles: share link (read-only display) · manual entry   │
-│ Export CSV                                                    │
-└──────────────────────────────────────────────────────────────┘
+┌─────────────┬────────────────────────────────────────────────┐
+│ NET WORTH   │ ┌─ Total balance ─────────────  ( ⟳ Refresh ) ┐│  hero glass card
+│ TRACKER     │ │ $128,442.18                                  ││
+│             │ │ (▲ $1,204.55 (+0.9%) past 7 days)  chip      ││
+│ ▸ Summary   │ │ refreshed 9:41 AM                            ││
+│   Net worth │ └──────────────────────────────────────────────┘│
+│   Spending  │ ┌─ Past 30 days ──────────┐ ┌─ This month ────┐│
+│   Settings  │ │   ── sparkline ──       │ │ Spent   $318.26 ││
+│             │ └─────────────────────────┘ │ Income    $1.70 ││
+│             │ ┌─ Accounts ──────────────┐ └─────────────────┘│
+│             │ │ Chase Checking  $4,212.10   ok · 9:41 AM    ││
+│             │ │ Collectr       $46,432.41   stale · Jun 9   ││
+│             │ └─────────────────────────────────────────────┘│
+└─────────────┴────────────────────────────────────────────────┘
 ```
 
-**Hero & chart**
-- Hero figure: `--text-hero`, `--font-mono`, `--ink`. Delta line beneath in `--text-body`: arrow + amount + percent in `--pos`/`--neg`, the words "past 7 days" in `--ink-soft`.
-- Chart: line `--accent` at 1.5px; area fill `--accent-soft`; no chart border, no vertical gridlines, horizontal gridlines `--hairline` at most 3; axis labels `--text-small` mono `--ink-soft`. Tooltip: small raised panel (`--bg-raised`, 1px `--hairline`) with date, total, and per-account breakdown, all mono.
-- Range toggles: text buttons; active = `--ink` with 2px `--accent` underline; inactive = `--ink-soft`. No pill backgrounds.
+**Sidebar** — glass panel: app name eyebrow at top, vertical nav of real buttons (keyboard focusable, focus rings). Active item: `--accent` text on an `--accent-soft` pill background; inactive: `--ink-soft`.
 
-**Allocation**
-- Donut, 4 series max, colors: accent (investments), ink at 70% (collectibles), ink-soft (cash) — credit is not a donut slice; show it under the legend as a mono line: `Credit offset −$842.33`. Legend rows: swatch square (8px), label sans, then % and $ right-aligned mono.
+**Tab 1 — Summary (default)**: hero card ("Total balance" eyebrow, `--text-hero` mono figure, 7-day delta chip in a glass pill, last-refreshed line, Refresh pill button), compact 30-day sparkline card (no axes), quick-stat card (this month's spend + income from `/api/spending/summary`), and the accounts card.
+
+**Tab 2 — Net worth**: oversized figure + delta line, full time-series chart with range toggles, and the allocation donut card.
+- Chart: line `--accent` at 1.5px; area fill `--accent-soft`; no chart border, no vertical gridlines, horizontal gridlines `--hairline` at most 3; axis labels `--text-small` mono `--ink-soft`. Tooltip: small raised panel (`--bg-raised`, 1px `--hairline`), all mono. Draw-in animation runs the first time the tab is shown.
+- Range toggles: text buttons; active = `--ink` with 2px `--accent` underline; inactive = `--ink-soft`.
+- Allocation donut: slices per DECISIONS.md (stocks/crypto/collectibles/cash/Fidelity cash; neutral slices use ink `#1D2433` at varying alpha); credit is not a slice — mono line `Credit offset −$842.33` under the legend. Legend rows: swatch (8px), label sans, % and $ right-aligned mono.
+
+**Tab 3 — Spending**: bar chart card — monthly expenses for the last 6 months (accent bars, rounded tops, mono axes) with income as muted secondary bars; current-month card — big mono expenses figure with income beneath; category breakdown card — rows of category + mono amount, sorted desc, top 8 + "Other".
+
+**Tab 4 — Settings**: glass cards for Connections (connect/reconnect/disconnect with typed confirm), Collectibles (Collectr share link display, manual value entry), and Data (Export CSV, API base URL).
 
 **Accounts table**
-- Hairline row dividers only. Columns: name (sans) + type eyebrow, balance (mono, right-aligned, negatives in `--neg`), status (dot + word + timestamp in `--text-small`). Status dot colors: ok `--pos`, stale `--warn`, error `--neg`. An error row shows its fix inline as a text button: "Reconnect".
+- Hairline row dividers only, inside its glass card. Columns: name (sans) + type eyebrow, balance (mono, right-aligned, negatives in `--neg`), status (dot + word + timestamp in `--text-small`). Status dot colors: ok `--pos`, stale `--warn`, error `--neg`. An error row shows its fix inline as a text button: "Reconnect".
 
 ## 4. Mini window (360 × 480)
 
-Same tokens at small scale. Number first, sparkline second, controls last.
+Same tokens at small scale; the whole window body is a single glass card on the gradient background. Number first, sparkline second, controls last.
 
 ```
 ┌──────────────────────────────┐
@@ -126,7 +134,7 @@ Same tokens at small scale. Number first, sparkline second, controls last.
 
 Design these explicitly; they are not afterthoughts.
 
-- **Empty (fresh install):** centered block — eyebrow "NET WORTH TRACKER", one sentence ("Connect your first account to start tracking."), one primary button "Connect bank", secondary text link "Add collectibles manually". No empty chart skeletons.
+- **Empty (fresh install):** the content area (sidebar stays) shows a centered block — eyebrow "NET WORTH TRACKER", one sentence ("Connect your first account to start tracking."), one primary button "Connect bank", secondary text link "Add collectibles manually" (jumps to the Settings tab). No empty chart skeletons.
 - **Loading:** skeleton bars (hairline-colored, subtle pulse) sized exactly like the content they replace. Never spinners, never blank flashes.
 - **Stale:** content renders normally; a `--warn` badge "stale · {date}" next to the affected account and the timestamp. Data is never hidden just because it's old.
 - **Error:** plain-language line naming the problem and the action: "Chase needs to be reconnected. → Reconnect". Errors never apologize and never show raw API messages.
@@ -134,10 +142,10 @@ Design these explicitly; they are not afterthoughts.
 
 ## 6. Interaction & motion
 
-- One orchestrated moment only: on dashboard load, the chart line draws in left-to-right over 600ms ease-out. Everything else is instant. Honor `prefers-reduced-motion: reduce` by disabling it.
-- Hover: table rows raise to `--bg-raised`; chart hover shows a 1px vertical hairline crosshair + tooltip.
-- Buttons: primary = `--accent` background, white text, `--radius`; secondary = text button in `--accent`; destructive = text button in `--neg`. Same label through a flow: "Refresh" → progress → "Refreshed 9:41 AM".
-- Focus: `--focus-ring` outline with 2px offset on every interactive element. Full keyboard path: range toggles are a radiogroup; table actions reachable by Tab.
+- One orchestrated moment only: the first time the Net worth tab is shown, the chart line draws in left-to-right over 600ms ease-out. Everything else is instant (tab switches included). Honor `prefers-reduced-motion: reduce` by disabling it.
+- Hover: glass cards raise to `--glass-bg-hover`; table rows raise to `--bg-raised`; chart hover shows a 1px vertical hairline crosshair + tooltip.
+- Buttons: pills are now allowed — primary = `--accent` fill, white text, fully rounded; secondary = glass pill (`--glass-bg`, glass border, fully rounded); tertiary = text button in `--accent`; destructive = text button in `--neg`. Same label through a flow: "Refresh" → progress → "Refreshed 9:41 AM".
+- Focus: `--focus-ring` outline with 2px offset on every interactive element. Full keyboard path: sidebar nav are real buttons; range toggles are a radiogroup; table actions reachable by Tab.
 
 ## 7. Copy reference
 
