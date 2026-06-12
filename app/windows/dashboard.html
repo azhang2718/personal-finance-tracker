@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <!-- CSP: local scripts + the Plaid Link loader only. connect-src allows
+       http(s) because the API base URL is user-configurable; the default is
+       loopback. No other remote code. -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self' https://cdn.plaid.com; style-src 'self' 'unsafe-inline'; connect-src http: https:; frame-src https://cdn.plaid.com; img-src 'self' data:;" />
+  <title>Net Worth Tracker</title>
+  <link rel="stylesheet" href="../shared/tokens.css" />
+  <link rel="stylesheet" href="dashboard.css" />
+</head>
+<body>
+  <main class="page" id="page">
+
+    <!-- ============ Empty state (fresh install) ============ -->
+    <section id="empty-state" class="empty-state" hidden>
+      <p class="eyebrow">Net worth tracker</p>
+      <p class="empty-line">Connect your first account to start tracking.</p>
+      <button class="btn-primary" id="empty-connect">Connect bank</button>
+      <button class="btn-text" id="empty-manual">Add collectibles manually</button>
+    </section>
+
+    <!-- ============ Main dashboard ============ -->
+    <div id="dashboard" hidden>
+
+      <!-- Header row -->
+      <header class="header-row">
+        <span class="eyebrow">Net worth</span>
+        <span class="header-right">
+          <span id="refreshed-at" class="num soft small"></span>
+          <button class="btn-text" id="refresh-btn">⟳ Refresh</button>
+        </span>
+      </header>
+      <p id="global-error" class="error-line" hidden></p>
+
+      <!-- Hero -->
+      <section class="hero" aria-live="polite">
+        <div class="hero-figure num" id="hero-figure"><span class="skeleton">$000,000.00</span></div>
+        <div class="delta-line" id="delta-line"><span class="skeleton">▲ $0,000.00 (+0.0%) past 7 days</span></div>
+      </section>
+
+      <!-- Time-series chart, edge to edge -->
+      <section class="chart-wrap">
+        <div class="chart-box"><canvas id="series-chart" aria-label="Net worth over time"></canvas></div>
+        <div class="range-toggles" role="radiogroup" aria-label="Chart range">
+          <button class="range-btn" role="radio" aria-checked="false" data-range="1m">1M</button>
+          <button class="range-btn" role="radio" aria-checked="false" data-range="3m">3M</button>
+          <button class="range-btn" role="radio" aria-checked="false" data-range="1y">1Y</button>
+          <button class="range-btn active" role="radio" aria-checked="true" data-range="all">All</button>
+        </div>
+      </section>
+
+      <!-- Allocation + accounts -->
+      <section class="two-col hairline-top">
+        <div class="col">
+          <h2 class="eyebrow section-label">Allocation</h2>
+          <div class="donut-box"><canvas id="donut-chart" aria-label="Allocation by asset class"></canvas></div>
+          <ul class="legend" id="allocation-legend"></ul>
+          <p class="num small soft" id="credit-offset"></p>
+        </div>
+        <div class="col">
+          <h2 class="eyebrow section-label">Accounts</h2>
+          <table class="accounts-table" id="accounts-table">
+            <tbody id="accounts-tbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Settings -->
+      <section class="settings hairline-top">
+        <h2 class="eyebrow section-label">Settings</h2>
+
+        <div class="settings-row">
+          <span class="settings-label">Banks</span>
+          <span class="settings-control">
+            <button class="btn-primary" id="connect-bank">Connect bank</button>
+            <span id="item-actions"></span>
+          </span>
+        </div>
+
+        <div class="settings-row" id="disconnect-confirm-row" hidden>
+          <span class="settings-label"></span>
+          <span class="settings-control confirm-block">
+            <span id="disconnect-confirm-text"></span>
+            <input type="text" id="disconnect-confirm-input" aria-label="Type institution name to confirm" />
+            <button class="btn-danger" id="disconnect-confirm-btn" disabled>Disconnect &amp; delete</button>
+            <button class="btn-text" id="disconnect-cancel-btn">Cancel</button>
+          </span>
+        </div>
+
+        <div class="settings-row">
+          <span class="settings-label">Collectibles share link</span>
+          <span class="settings-control num small" id="collectr-url">—</span>
+        </div>
+
+        <div class="settings-row">
+          <label class="settings-label" for="manual-collectibles">Collectibles value</label>
+          <span class="settings-control">
+            <input type="number" id="manual-collectibles" min="0" step="0.01" placeholder="0.00" />
+            <button class="btn-text" id="manual-save">Save</button>
+            <span class="small soft" id="manual-status"></span>
+          </span>
+        </div>
+
+        <div class="settings-row">
+          <span class="settings-label">Data</span>
+          <span class="settings-control">
+            <button class="btn-text" id="export-csv">Export CSV</button>
+          </span>
+        </div>
+
+        <div class="settings-row">
+          <label class="settings-label" for="api-base-url">API base URL</label>
+          <span class="settings-control">
+            <input type="url" id="api-base-url" spellcheck="false" />
+            <button class="btn-text" id="api-base-save">Save</button>
+            <span class="small soft" id="api-base-status"></span>
+          </span>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script src="../lib/chart.umd.js"></script>
+  <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
+  <script src="../shared/format.js"></script>
+  <script src="../shared/api.js"></script>
+  <script src="dashboard.js"></script>
+</body>
+</html>

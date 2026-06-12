@@ -1,0 +1,153 @@
+/* Design tokens — source of truth per DESIGN.md Section 2.
+   Shared by the mini window and the dashboard window. */
+:root {
+  /* Color */
+  --bg:            #FAF9F6;  /* warm off-white, page background */
+  --bg-raised:     #FFFFFF;  /* settings panel, table rows on hover */
+  --ink:           #1A1A1A;  /* primary text */
+  --ink-soft:      #6B6B66;  /* secondary text, labels, axes */
+  --hairline:      #E4E1DA;  /* all borders and dividers, 1px only */
+  --accent:        #4A90D9;  /* sky blue: chart line, primary actions, focus */
+  --accent-soft:   #4A90D91A; /* 10% accent: chart area fill */
+  --pos:           #4C7A5A;  /* desaturated green, change indicators only */
+  --neg:           #B05A52;  /* desaturated red, change indicators only */
+  --warn:          #A8842F;  /* stale badges */
+
+  /* Type */
+  --font-ui:   "Geist", system-ui, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, monospace;
+
+  /* Scale (rem) */
+  --text-hero: 3.5rem;   /* net worth figure, mono, weight 500 */
+  --text-h1:   1.25rem;  /* section labels, sans, weight 600 */
+  --text-body: 0.9375rem;
+  --text-small:0.8125rem;/* captions, axes, timestamps */
+
+  /* Space — 4px base scale */
+  --s-1: 4px;  --s-2: 8px;  --s-3: 16px;  --s-4: 24px;
+  --s-5: 40px; --s-6: 64px;
+
+  --radius: 2px;          /* near-square; this is editorial, not bubbly */
+  --focus-ring: 2px solid var(--accent);
+}
+
+/* Base typography & resets shared by both windows */
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+body { font-size: var(--text-body); }
+
+.mono,
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Eyebrow labels: letterspaced uppercase small caps */
+.eyebrow {
+  font-family: var(--font-ui);
+  font-size: var(--text-small);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+/* Buttons */
+button {
+  font: inherit;
+  cursor: pointer;
+  border-radius: var(--radius);
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  padding: var(--s-2) var(--s-3);
+  font-weight: 500;
+}
+.btn-primary:disabled { opacity: 0.6; cursor: default; }
+
+.btn-text {
+  background: none;
+  border: none;
+  padding: var(--s-1) var(--s-1);
+  color: var(--accent);
+}
+.btn-text:disabled { color: var(--ink-soft); cursor: default; }
+
+.btn-danger {
+  background: none;
+  border: none;
+  padding: var(--s-1) var(--s-1);
+  color: var(--neg);
+}
+
+/* Visible keyboard focus on every interactive element */
+button:focus-visible,
+input:focus-visible,
+a:focus-visible,
+[tabindex]:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+input[type="text"],
+input[type="number"],
+input[type="url"] {
+  font: inherit;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  background: var(--bg-raised);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  padding: var(--s-2);
+  color: var(--ink);
+}
+
+/* Status colors */
+.pos  { color: var(--pos); }
+.neg  { color: var(--neg); }
+.warn { color: var(--warn); }
+.soft { color: var(--ink-soft); }
+
+/* Status dot */
+.dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  vertical-align: middle;
+}
+.dot.ok    { background: var(--pos); }
+.dot.stale { background: var(--warn); }
+.dot.error { background: var(--neg); }
+
+/* Loading skeletons — hairline-colored bars with subtle pulse, never spinners */
+.skeleton {
+  background: var(--hairline);
+  border-radius: var(--radius);
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+  color: transparent !important;
+  user-select: none;
+}
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.55; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; }
+}
+
+.hairline-top    { border-top: 1px solid var(--hairline); }
+.hairline-bottom { border-bottom: 1px solid var(--hairline); }

@@ -1,0 +1,187 @@
+/* Dashboard layout — DESIGN.md Section 3.
+   12-column grid feel via max-width 1080px, hairline dividers, no boxes. */
+
+.page {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: var(--s-5);
+}
+
+.small { font-size: var(--text-small); }
+
+/* ---- Empty state ---- */
+.empty-state {
+  min-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-3);
+  text-align: center;
+}
+.empty-line { font-size: var(--text-h1); margin: 0; }
+
+/* ---- Header row ---- */
+.header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: var(--s-4);
+}
+.header-right { display: inline-flex; align-items: baseline; gap: var(--s-3); }
+
+.error-line {
+  color: var(--neg);
+  font-size: var(--text-body);
+  margin: 0 0 var(--s-3);
+}
+.error-line .btn-text { padding-left: var(--s-2); }
+
+/* ---- Hero ---- */
+.hero { margin-bottom: var(--s-4); }
+.hero-figure {
+  font-size: var(--text-hero);
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  min-height: 1.1em; /* reserve space — no layout shift */
+}
+.delta-line {
+  font-size: var(--text-body);
+  margin-top: var(--s-2);
+  min-height: 1.4em;
+}
+.delta-line .soft-words { color: var(--ink-soft); }
+
+/* ---- Chart ---- */
+.chart-wrap {
+  /* edge-to-edge within content width */
+  margin: 0 0 var(--s-5);
+}
+.chart-box {
+  position: relative;
+  height: 300px;
+}
+.range-toggles {
+  display: flex;
+  gap: var(--s-4);
+  margin-top: var(--s-3);
+}
+.range-btn {
+  background: none;
+  border: none;
+  padding: var(--s-1) 0;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-small);
+  color: var(--ink-soft);
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+}
+.range-btn.active {
+  color: var(--ink);
+  border-bottom-color: var(--accent);
+}
+
+/* ---- Two-column: allocation + accounts ---- */
+.two-col {
+  display: grid;
+  grid-template-columns: 5fr 7fr;
+  gap: var(--s-6);
+  padding: var(--s-5) 0;
+}
+.section-label { margin: 0 0 var(--s-4); }
+
+.donut-box {
+  position: relative;
+  height: 180px;
+  width: 180px;
+  margin-bottom: var(--s-4);
+}
+
+.legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.legend li {
+  display: grid;
+  grid-template-columns: 16px 1fr auto auto;
+  gap: var(--s-2);
+  align-items: baseline;
+  padding: var(--s-1) 0;
+}
+.legend .swatch {
+  width: 8px;
+  height: 8px;
+  display: inline-block;
+  align-self: center;
+}
+.legend .lpct, .legend .lval {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  padding-left: var(--s-3);
+}
+#credit-offset { margin-top: var(--s-3); }
+
+/* ---- Accounts table ---- */
+.accounts-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.accounts-table tr {
+  border-bottom: 1px solid var(--hairline);
+}
+.accounts-table tr:hover { background: var(--bg-raised); }
+.accounts-table td {
+  padding: var(--s-3) var(--s-2) var(--s-3) 0;
+  vertical-align: top;
+}
+.acct-name { font-weight: 500; }
+.acct-type {
+  display: block;
+  font-size: var(--text-small);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.acct-balance {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+.acct-status {
+  font-size: var(--text-small);
+  color: var(--ink-soft);
+  text-align: right;
+  white-space: nowrap;
+}
+.acct-status .dot { margin-right: var(--s-1); }
+
+/* ---- Settings ---- */
+.settings { padding: var(--s-5) 0; }
+.settings-row {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: var(--s-3);
+  align-items: center;
+  padding: var(--s-3) 0;
+  border-bottom: 1px solid var(--hairline);
+}
+.settings-row:last-child { border-bottom: none; }
+.settings-label { color: var(--ink-soft); }
+.settings-control {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+  word-break: break-all;
+}
+.confirm-block { color: var(--ink); }
+#item-actions { display: inline-flex; gap: var(--s-3); flex-wrap: wrap; }
+.item-chip { display: inline-flex; align-items: center; gap: var(--s-2); }
+
+#api-base-url { width: 280px; }
+#manual-collectibles { width: 140px; text-align: right; }
