@@ -391,6 +391,11 @@
                 <div class="card-title">All Transactions</div>
                 <div class="card-sub soft"><span id="txn-month-label">—</span> · <span id="txn-count">0</span> shown · recategorize or delete to update the totals above</div>
               </div>
+              <select class="month-select" id="txn-group-select" aria-label="Group transactions">
+                <option value="date">By date</option>
+                <option value="sign">Income / Spending</option>
+                <option value="category">By category</option>
+              </select>
             </div>
             <div class="txn-list" id="txn-list"></div>
             <div class="txn-deleted-wrap" id="txn-deleted-wrap" hidden>

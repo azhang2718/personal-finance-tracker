@@ -28,6 +28,11 @@
   let latestCurrent  = null;
   // Month currently shown in the spending tab (category list + txn table).
   let selectedSpendMonth = null;
+  // How the transaction table groups rows: 'date' | 'sign' | 'category'.
+  let txnGroupMode = 'date';
+  // Last-rendered transactions, so changing the grouping re-renders w/o refetch.
+  let latestTxns = [];
+  let latestTxnMonth = null;
 
   // Categories selectable when recategorizing a transaction (ordered).
   const SPEND_CATEGORIES = [
@@ -847,10 +852,52 @@
     return row;
   }
 
+  // A group header row: colored dot, label, signed total, count.
+  function buildGroupHead(label, color, totalSigned, count) {
+    const head = document.createElement('div');
+    head.className = 'txn-group-head';
+    const totalClass = totalSigned >= 0 ? 'pos' : 'neg';
+    const totalText = (totalSigned >= 0 ? '+' : '−') + FMT.dollars(Math.abs(totalSigned));
+    head.innerHTML =
+      `<span class="txn-group-dot" style="background:${color}"></span>
+       <span class="txn-group-name">${escapeHtml(label)}</span>
+       <span class="txn-group-count">${count}</span>
+       <span class="txn-group-total ${totalClass}">${totalText}</span>`;
+    return head;
+  }
+
+  // Split active transactions into ordered groups per the current group mode.
+  // Returns [{ label, color, items }] with items kept newest-first.
+  function groupActiveTxns(active) {
+    if (txnGroupMode === 'sign') {
+      const income = active.filter((t) => t.amount_cents < 0);
+      const spend  = active.filter((t) => t.amount_cents > 0);
+      const groups = [];
+      if (income.length) groups.push({ label: 'Income', color: catColor('Income'), items: income });
+      if (spend.length)  groups.push({ label: 'Spending', color: '#7c8694', items: spend });
+      return groups;
+    }
+    if (txnGroupMode === 'category') {
+      const byCat = new Map();
+      for (const t of active) {
+        if (!byCat.has(t.category)) byCat.set(t.category, []);
+        byCat.get(t.category).push(t);
+      }
+      // Order categories by total magnitude moved, descending.
+      const magnitude = (items) => items.reduce((a, t) => a + Math.abs(t.amount_cents), 0);
+      return [...byCat.entries()]
+        .sort((a, b) => magnitude(b[1]) - magnitude(a[1]))
+        .map(([cat, items]) => ({ label: prettify(cat), color: catColor(cat), items }));
+    }
+    return null; // 'date' → flat, no grouping
+  }
+
   // Render the editable transaction table for one month (active rows + a
   // collapsible list of soft-deleted ones that can be restored).
   function renderTransactions(transactions, month) {
     const all = transactions || [];
+    latestTxns = all;
+    latestTxnMonth = month;
     const active = all.filter((t) => !t.excluded);
     const deleted = all.filter((t) => t.excluded);
 
@@ -865,7 +912,16 @@
       if (active.length === 0) {
         list.innerHTML = '<p class="txn-empty">No transactions recorded this month.</p>';
       } else {
-        for (const t of active) list.appendChild(buildTxnRow(t, false));
+        const groups = groupActiveTxns(active);
+        if (!groups) {
+          for (const t of active) list.appendChild(buildTxnRow(t, false));
+        } else {
+          for (const g of groups) {
+            const signedTotal = g.items.reduce((a, t) => a + -t.amount_cents, 0);
+            list.appendChild(buildGroupHead(g.label, g.color, signedTotal, g.items.length));
+            for (const t of g.items) list.appendChild(buildTxnRow(t, false));
+          }
+        }
       }
     }
 
@@ -2100,6 +2156,16 @@
     // Spending month picker
     const monthSel = $('month-select');
     if (monthSel) monthSel.addEventListener('change', onMonthSelectChange);
+
+    // Group transactions by date / income-spending / category (re-renders the
+    // already-loaded month, no refetch).
+    const groupSel = $('txn-group-select');
+    if (groupSel) {
+      groupSel.addEventListener('change', () => {
+        txnGroupMode = groupSel.value;
+        if (latestTxnMonth) renderTransactions(latestTxns, latestTxnMonth);
+      });
+    }
 
     // Collapsible "Deleted" section in the transaction table
     const delToggle = $('txn-deleted-toggle');
