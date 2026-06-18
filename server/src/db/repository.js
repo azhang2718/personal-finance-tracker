@@ -278,9 +278,10 @@ export function recategorizeAllTransactions() {
 /**
  * Monthly expense/income totals from the transactions cache, oldest→newest.
  * Expenses: positive amounts on cash/credit accounts, with transfers and
- * credit-card payments excluded (see EXCLUDED_FROM_SPENDING). Income: EVERY
- * inflow (negative amount) on a depository ('cash') account, sign-flipped —
- * transfers included by owner's definition: anything arriving in checking counts.
+ * credit-card payments excluded (see EXCLUDED_FROM_SPENDING). Income: inflows
+ * (negative amount) on a depository ('cash') account, sign-flipped, with the
+ * same exclusions — so internal account-to-account moves and card payments
+ * don't inflate income, but P2P money (Venmo/Zelle, categorized 'P2P') counts.
  */
 export function getSpendingByMonth(sinceDate) {
   const db = getDb();
@@ -290,7 +291,9 @@ export function getSpendingByMonth(sinceDate) {
       SUM(CASE WHEN t.amount_cents > 0 AND a.type IN ('cash','credit')
                 AND t.category NOT IN ${EXCLUDED_SQL}
                THEN t.amount_cents ELSE 0 END) AS expenses_cents,
-      SUM(CASE WHEN t.amount_cents < 0 AND a.type = 'cash' THEN -t.amount_cents ELSE 0 END) AS income_cents
+      SUM(CASE WHEN t.amount_cents < 0 AND a.type = 'cash'
+                AND t.category NOT IN ${EXCLUDED_SQL}
+               THEN -t.amount_cents ELSE 0 END) AS income_cents
     FROM transactions_cache t
     JOIN accounts a ON a.id = t.account_id
     WHERE t.date >= ?

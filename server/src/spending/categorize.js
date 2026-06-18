@@ -49,6 +49,12 @@ const NAME_RULES = [
 // Names that signal a credit-card payment (so we can exclude it from spending).
 const CC_PAYMENT_NAME = /credit\s*(crd|card)|card\s*(payment|autopay)|\bcc\s*autopay/i;
 
+// Names that signal a peer-to-peer money app (Venmo, Zelle, Cash App, PayPal,
+// Apple Cash). Unlike a bank transfer between your *own* accounts, these move
+// real money to and from other people, so they count as income (when received)
+// or expense (when paid) rather than being excluded. See cleanCategory.
+const P2P_NAME = /\bvenmo\b|\bzelle\b|cash\s*app|cashapp|paypal|apple\s*cash/i;
+
 // Every resolved label this module can emit. Used to make re-categorization
 // idempotent: a row already holding a clean label is left as-is (so we never
 // lose a Plaid-derived category on a re-run), except 'Other', which is retried
@@ -57,6 +63,7 @@ const CLEAN_LABELS = new Set([
   ...Object.values(PRIMARY_MAP),
   ...NAME_RULES.map(([, bucket]) => bucket),
   'Credit Card Payment',
+  'P2P',
   'Other',
 ]);
 
@@ -72,14 +79,21 @@ const CLEAN_LABELS = new Set([
  */
 export function cleanCategory(primary, detailed, name) {
   const raw = String(primary || '');
+  const n = String(name || '');
+  const p = raw.toUpperCase();
+
+  // Peer-to-peer payments to/from people are real income or expense, not an
+  // internal transfer. Only rescue rows that would otherwise be a Transfer, so
+  // a merchant charge processed *through* PayPal (e.g. "PAYPAL *STEAM") keeps
+  // its real category. Runs before the idempotent check so already-stored
+  // 'Transfer' rows get reclassified on the next re-categorization pass.
+  const isTransfer = p === 'TRANSFER' || p === 'TRANSFER_IN' || p === 'TRANSFER_OUT';
+  if (isTransfer && P2P_NAME.test(n)) return 'P2P';
 
   // Idempotent re-runs: an already-resolved clean label stays put (so we don't
   // clobber a Plaid-derived category whose merchant name matches no rule).
   // 'Other' is the exception — retry it, in case the name rules improved.
   if (raw !== 'Other' && CLEAN_LABELS.has(raw)) return raw;
-
-  const p = raw.toUpperCase();
-  const n = String(name || '');
 
   // Credit-card payoffs are a transfer between your own accounts, not spending
   // (the underlying charges are already counted). Detect by name regardless of
