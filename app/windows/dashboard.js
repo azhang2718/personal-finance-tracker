@@ -1719,6 +1719,7 @@
   async function manualRefresh() {
     const btn = $('refresh-btn');
     btn.disabled = true;
+    btn.classList.add('spinning');
     try {
       await API.refresh(false);
       await loadAll();
@@ -1726,6 +1727,7 @@
       showGlobalError('Refresh failed — check that the local server is running.', 'Retry', manualRefresh);
     } finally {
       btn.disabled = false;
+      btn.classList.remove('spinning');
     }
   }
 
