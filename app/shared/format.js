@@ -13,11 +13,6 @@
     return `${negative ? '−' : ''}$${str}`;
   }
 
-  function pct(value) {
-    const n = Number(value);
-    return `${n >= 0 ? '+' : '−'}${Math.abs(n).toFixed(1)}%`;
-  }
-
   // "9:41 AM" for today, "Jun 9" otherwise.
   function shortWhen(isoOrDate) {
     if (!isoOrDate) return '';
@@ -36,5 +31,12 @@
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   }
 
-  window.FMT = { dollars, pct, shortWhen, shortDate };
+  // Today's date (YYYY-MM-DD) in US Central time, matching how the server keys
+  // snapshot dates. Using toISOString() instead keys to UTC, which rolls over
+  // to tomorrow in the evening Central and breaks "is today" comparisons.
+  function todayStr() {
+    return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
+  }
+
+  window.FMT = { dollars, shortWhen, shortDate, todayStr };
 })();

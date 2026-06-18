@@ -1,5 +1,10 @@
 import { getDb } from './schema.js';
 import { encrypt, decrypt } from '../crypto/index.js';
+import { cleanCategory, EXCLUDED_FROM_SPENDING } from '../spending/categorize.js';
+
+// SQL fragment: a parenthesised, quoted list of categories excluded from
+// spending totals, e.g. ('Transfer', 'Credit Card Payment').
+const EXCLUDED_SQL = `(${EXCLUDED_FROM_SPENDING.map((c) => `'${c}'`).join(', ')})`;
 
 // ─── Snapshots ────────────────────────────────────────────────────────────────
 
@@ -165,13 +170,6 @@ export function setAccountAssetClass(accountId, assetClass) {
   db.prepare(`UPDATE accounts SET asset_class = ? WHERE id = ?`).run(assetClass, accountId);
 }
 
-/**
- * Returns all accounts.
- */
-export function getAllAccounts() {
-  const db = getDb();
-  return db.prepare(`SELECT * FROM accounts`).all();
-}
 
 /**
  * Finds an account by plaid_account_id.
@@ -253,11 +251,36 @@ export function upsertTransaction({ id, accountId, date, name, amountCents, cate
 }
 
 /**
+ * Re-run categorization over every cached transaction using the current rules.
+ * Stored rows only carry a name + a previously-stored category (no Plaid
+ * `detailed`), which is exactly what cleanCategory() is built to handle. Run at
+ * startup so rule improvements take effect without waiting for a Plaid refresh.
+ * Only writes rows whose category actually changes. Returns the count updated.
+ */
+export function recategorizeAllTransactions() {
+  const db = getDb();
+  const rows = db.prepare('SELECT id, name, category FROM transactions_cache').all();
+  const update = db.prepare('UPDATE transactions_cache SET category = ? WHERE id = ?');
+  let changed = 0;
+  const tx = db.transaction(() => {
+    for (const r of rows) {
+      const next = cleanCategory(r.category, '', r.name);
+      if (next !== r.category) {
+        update.run(next, r.id);
+        changed++;
+      }
+    }
+  });
+  tx();
+  return changed;
+}
+
+/**
  * Monthly expense/income totals from the transactions cache, oldest→newest.
- * Expenses: positive amounts on cash/credit accounts, transfers excluded
- * (TRANSFER_IN/TRANSFER_OUT). Income: EVERY inflow (negative amount) on a
- * depository ('cash') account, sign-flipped — transfers included by owner's
- * definition: anything arriving in checking counts.
+ * Expenses: positive amounts on cash/credit accounts, with transfers and
+ * credit-card payments excluded (see EXCLUDED_FROM_SPENDING). Income: EVERY
+ * inflow (negative amount) on a depository ('cash') account, sign-flipped —
+ * transfers included by owner's definition: anything arriving in checking counts.
  */
 export function getSpendingByMonth(sinceDate) {
   const db = getDb();
@@ -265,7 +288,7 @@ export function getSpendingByMonth(sinceDate) {
     SELECT
       substr(t.date, 1, 7) AS month,
       SUM(CASE WHEN t.amount_cents > 0 AND a.type IN ('cash','credit')
-                AND t.category NOT IN ('TRANSFER_IN', 'TRANSFER_OUT')
+                AND t.category NOT IN ${EXCLUDED_SQL}
                THEN t.amount_cents ELSE 0 END) AS expenses_cents,
       SUM(CASE WHEN t.amount_cents < 0 AND a.type = 'cash' THEN -t.amount_cents ELSE 0 END) AS income_cents
     FROM transactions_cache t
@@ -290,7 +313,7 @@ export function getSpendingByCategory(monthPrefix) {
       AND t.pending = 0
       AND t.amount_cents > 0
       AND a.type IN ('cash','credit')
-      AND t.category NOT IN ('TRANSFER_IN', 'TRANSFER_OUT')
+      AND t.category NOT IN ${EXCLUDED_SQL}
     GROUP BY t.category
     ORDER BY cents DESC
   `).all(monthPrefix);

@@ -4,12 +4,11 @@
 
 Build a local-first personal net worth tracker for a single user. It aggregates balances from three sources — Chase (checking + credit card) and Fidelity (investments) via the **Plaid API**, and a Pokémon card collection via a **Collectr public share link** — then visualizes net worth over time and its distribution across asset classes.
 
-The product is a **native macOS desktop app** (Electron, distributed as a `.app` / DMG) with two surfaces:
+The product is a **native macOS desktop app** (Electron, distributed as a `.app` / DMG) with a single surface:
 
-1. A **compact mini window** (menu-bar popover or small always-on-top window): at-a-glance view (current net worth, daily/weekly change, 30-day sparkline).
-2. A **full dashboard window**: full time-series chart, allocation breakdown, per-account detail, and data management.
+1. A **full dashboard window**: full time-series chart, allocation breakdown, per-account detail, and data management.
 
-Both surfaces are thin clients rendered by the Electron renderer process. All secrets, API calls, and scraping live in a **local backend server** that the app spawns as a child process on launch (and shuts down on quit). The renderer never holds a Plaid secret or access token.
+The dashboard is a thin client rendered by the Electron renderer process. All secrets, API calls, and scraping live in a **local backend server** that the app spawns as a child process on launch (and shuts down on quit). The renderer never holds a Plaid secret or access token.
 
 **Portability requirement:** the app must run on any machine (primary target: macOS on Apple Silicon). The API base URL (host + port) is configurable — defaulting to `http://127.0.0.1:8123` — via app settings, not hardcoded. Nothing in the client or server may assume a single fixed machine, IP, or absolute path; all paths derive from the app's user-data directory.
 

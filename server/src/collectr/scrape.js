@@ -1,6 +1,11 @@
 import * as cheerio from 'cheerio';
 import { getConfig } from '../config.js';
 import { getDb } from '../db/schema.js';
+import { getMeta, setMeta } from '../db/repository.js';
+
+// Meta key for the user-editable Collectr share link. When set, it overrides
+// COLLECTR_SHARE_URL from the environment so the link can be changed in-app.
+const COLLECTR_URL_KEY = 'collectr_share_url';
 
 const CACHE_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
 const FETCH_TIMEOUT_MS = 10_000;
@@ -50,6 +55,15 @@ function saveToCache(valueCents) {
  * Returns value in cents, or null if not found.
  */
 function extractFromHtml(html) {
+  // Strategy 0 (most reliable): Collectr embeds the data in its Next.js payload
+  // as JSON. On getcollectr.com showcase pages the visible DOM is just a skeleton
+  // until client hydration, so DOM scraping is unreliable — but the value is
+  // present in the server-streamed payload:
+  //   "portfolio_value":[{"price":"4401.116","insertion_date":"2026-06-17T..."}]
+  // (the quotes are usually backslash-escaped inside a JS string).
+  const payloadValue = extractFromCollectrPayload(html);
+  if (payloadValue !== null) return payloadValue;
+
   const $ = cheerio.load(html);
 
   // Strategy 1: data attributes common in portfolio apps
@@ -106,6 +120,33 @@ function extractFromHtml(html) {
   }
 
   return null;
+}
+
+/**
+ * Extract the portfolio value from Collectr's embedded Next.js JSON payload.
+ * Returns value in cents, or null if not found.
+ */
+function extractFromCollectrPayload(html) {
+  if (!html) return null;
+  // The payload lives inside a JS string with escaped quotes (\"). Normalising
+  // them lets one regex handle both escaped and unescaped forms.
+  const normalised = html.replace(/\\"/g, '"');
+  const match = normalised.match(/"portfolio_value"\s*:\s*(\[[^\]]*\])/);
+  if (!match) return null;
+
+  let entries;
+  try {
+    entries = JSON.parse(match[1]);
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(entries) || entries.length === 0) return null;
+
+  // Pick the most recent entry by insertion_date (the array may hold history).
+  entries.sort((a, b) => new Date(b?.insertion_date || 0) - new Date(a?.insertion_date || 0));
+  const price = parseFloat(entries[0]?.price);
+  if (isNaN(price) || price < 0) return null;
+  return Math.round(price * 100);
 }
 
 /**
@@ -171,12 +212,13 @@ async function fetchWithPlaywright(url) {
  * Main scrape function.
  * Returns { value_cents, status: 'ok'|'stale', lastUpdated: ISO string }
  */
-export async function scrapeCollectr() {
+export async function scrapeCollectr({ force = false } = {}) {
   // Initialize cache from DB if needed
   if (_cache === null) loadCacheFromDb();
 
-  // Return cached if fresh
-  if (_cache && Date.now() - _cache.fetchedAt < CACHE_TTL_MS) {
+  // Return cached if fresh (unless a forced re-scrape was requested, e.g. right
+  // after the share link changed).
+  if (!force && _cache && Date.now() - _cache.fetchedAt < CACHE_TTL_MS) {
     return {
       value_cents: _cache.value_cents,
       status: 'ok',
@@ -184,8 +226,16 @@ export async function scrapeCollectr() {
     };
   }
 
-  const config = getConfig();
-  const url = config.COLLECTR_SHARE_URL;
+  const url = getCollectrUrl();
+
+  if (!url) {
+    return {
+      value_cents: _cache ? _cache.value_cents : null,
+      status: _cache ? 'stale' : 'error',
+      lastUpdated: _cache ? new Date(_cache.fetchedAt).toISOString() : null,
+      message: 'COLLECTR_SHARE_URL is not configured.',
+    };
+  }
 
   let lastErr = null;
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
@@ -263,7 +313,32 @@ export async function scrapeCollectr() {
 }
 
 /**
- * Resets the in-memory cache (used in tests).
+ * The effective Collectr share link: the in-app value (DB) takes precedence
+ * over COLLECTR_SHARE_URL from the environment. Returns null if neither is set.
+ */
+export function getCollectrUrl() {
+  let stored = null;
+  try {
+    stored = getMeta(COLLECTR_URL_KEY);
+  } catch {
+    // DB not ready — fall back to env.
+  }
+  if (stored && stored.trim() !== '') return stored.trim();
+  const envUrl = getConfig().COLLECTR_SHARE_URL;
+  return envUrl && envUrl.trim() !== '' ? envUrl.trim() : null;
+}
+
+/**
+ * Persists a new Collectr share link (or clears it when given an empty value)
+ * and invalidates the scrape cache so the next refresh uses the new link.
+ */
+export function setCollectrUrl(url) {
+  setMeta(COLLECTR_URL_KEY, url == null ? '' : String(url).trim());
+  resetCache();
+}
+
+/**
+ * Resets the in-memory cache (used in tests and after the URL changes).
  */
 export function resetCache() {
   _cache = null;

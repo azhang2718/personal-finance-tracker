@@ -11,10 +11,7 @@ import {
 } from './db/repository.js';
 import { scrapeCollectr } from './collectr/scrape.js';
 import { splitInvestmentSnapshots } from './plaid/investments.js';
-
-function todayStr() {
-  return new Date().toISOString().slice(0, 10);
-}
+import { todayStr } from './util/date.js';
 
 function mapPlaidType(plaidType, plaidSubtype) {
   const t = (plaidType || '').toLowerCase();

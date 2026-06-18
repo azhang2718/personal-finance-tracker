@@ -1,16 +1,17 @@
 // Electron main process.
 // Spawns the local API server as a child process on launch, kills it on quit.
-// Creates the mini window on startup and the dashboard window on demand.
-const { app, BrowserWindow, ipcMain, shell } = require('electron');
+// Creates the dashboard window on startup and on demand.
+const { app, BrowserWindow, ipcMain, shell, nativeImage, screen } = require('electron');
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 
-const DEFAULT_SETTINGS = {
-  apiBaseUrl: 'http://127.0.0.1:8123',
-};
+// App icon (dark variant). Packaged builds use build/icon.icns via
+// electron-builder; in dev we set the macOS dock icon explicitly since the
+// BrowserWindow `icon` option is ignored on macOS.
+const APP_ICON = path.join(__dirname, 'build', 'icon.png');
 
-let miniWindow = null;
 let dashboardWindow = null;
 let serverProcess = null;
 
@@ -35,16 +36,6 @@ function writeJsonFile(file, obj) {
   fs.writeFileSync(file, JSON.stringify(obj, null, 2), 'utf8');
 }
 
-function getSettings() {
-  const stored = readJsonFile(userDataPath('settings.json'), {});
-  return { ...DEFAULT_SETTINGS, ...stored };
-}
-
-function setSettings(partial) {
-  const merged = { ...getSettings(), ...(partial || {}) };
-  writeJsonFile(userDataPath('settings.json'), merged);
-  return merged;
-}
 
 function getCache(key) {
   const cache = readJsonFile(userDataPath('cache.json'), {});
@@ -139,6 +130,102 @@ function stopServer() {
 }
 
 // ---------------------------------------------------------------------------
+// Nightly snapshot: while the app is running, refresh balances once a day so a
+// data point is recorded each night (the server upserts one snapshot per day).
+// ---------------------------------------------------------------------------
+
+const SERVER_URL = 'http://127.0.0.1:8123';
+const REFRESH_HOUR = 3; // 3 AM local
+let nightlyTimer = null;
+
+async function runRefresh() {
+  try {
+    const res = await fetch(`${SERVER_URL}/api/refresh`, { method: 'POST' });
+    console.log(`[nightly] refresh triggered (status ${res.status})`);
+  } catch (err) {
+    console.warn('[nightly] refresh failed:', err.message);
+  }
+}
+
+function msUntilNextRefreshHour() {
+  const now = new Date();
+  const next = new Date(now);
+  next.setHours(REFRESH_HOUR, 0, 0, 0);
+  if (next <= now) next.setDate(next.getDate() + 1);
+  return next - now;
+}
+
+function scheduleNightlyRefresh() {
+  if (nightlyTimer) clearTimeout(nightlyTimer);
+  nightlyTimer = setTimeout(function fire() {
+    runRefresh();
+    nightlyTimer = setTimeout(fire, 24 * 60 * 60 * 1000); // every 24h thereafter
+  }, msUntilNextRefreshHour());
+}
+
+// ---------------------------------------------------------------------------
+// Server environment file (Plaid credentials etc.)
+//   Dev:      <repo>/server/.env      (loaded by the server via dotenv)
+//   Packaged: <userData>/server.env   (injected into the child's env)
+// ---------------------------------------------------------------------------
+
+function serverEnvPath() {
+  return app.isPackaged
+    ? userDataPath('server.env')
+    : path.join(__dirname, '..', 'server', '.env');
+}
+
+function serializeEnv(obj) {
+  return (
+    Object.entries(obj)
+      .filter(([, v]) => v !== undefined && v !== null && v !== '')
+      .map(([k, v]) => `${k}=${v}`)
+      .join('\n') + '\n'
+  );
+}
+
+// Non-secret status for the settings UI — never returns the actual secret.
+function getServerEnvStatus() {
+  const env = parseEnvFile(serverEnvPath());
+  return {
+    plaidConfigured: Boolean(env.PLAID_CLIENT_ID && env.PLAID_SECRET && env.ENCRYPTION_KEY),
+    plaidEnv: env.PLAID_ENV || 'sandbox',
+    clientIdHint: env.PLAID_CLIENT_ID ? `••••${env.PLAID_CLIENT_ID.slice(-4)}` : '',
+  };
+}
+
+async function restartServer() {
+  await new Promise((resolve) => {
+    if (!serverProcess) return resolve();
+    let done = false;
+    const finish = () => { if (!done) { done = true; resolve(); } };
+    serverProcess.once('exit', finish);
+    serverProcess.kill();
+    setTimeout(finish, 2500); // safety net if 'exit' never fires
+  });
+  serverProcess = null;
+  startServer();
+}
+
+// Merge keys into the env file and restart the server so they take effect.
+// Auto-generates an ENCRYPTION_KEY the first time Plaid credentials are set.
+async function setServerEnv(partial) {
+  const file = serverEnvPath();
+  const next = { ...parseEnvFile(file) };
+  for (const [k, v] of Object.entries(partial || {})) {
+    if (v === undefined || v === null) continue;
+    next[k] = String(v).trim();
+  }
+  if ((next.PLAID_CLIENT_ID || next.PLAID_SECRET) && !next.ENCRYPTION_KEY) {
+    next.ENCRYPTION_KEY = crypto.randomBytes(32).toString('base64');
+  }
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, serializeEnv(next), 'utf8');
+  await restartServer();
+  return getServerEnvStatus();
+}
+
+// ---------------------------------------------------------------------------
 // Windows
 // ---------------------------------------------------------------------------
 
@@ -149,44 +236,24 @@ const COMMON_WEB_PREFERENCES = {
   preload: path.join(__dirname, 'preload.js'),
 };
 
-function createMiniWindow() {
-  if (miniWindow && !miniWindow.isDestroyed()) {
-    miniWindow.focus();
-    return;
-  }
-  miniWindow = new BrowserWindow({
-    width: 360,
-    height: 480,
-    useContentSize: true, // 360×480 of content — frame/menu don't eat into it
-    resizable: false,
-    fullscreenable: false,
-    maximizable: false,
-    autoHideMenuBar: true,
-    title: 'Net Worth',
-    backgroundColor: '#EEF3F9',
-    webPreferences: COMMON_WEB_PREFERENCES,
-  });
-  miniWindow.loadFile(path.join(__dirname, 'windows', 'mini.html'));
-  miniWindow.on('closed', () => {
-    miniWindow = null;
-  });
-}
-
 function createOrFocusDashboard() {
   if (dashboardWindow && !dashboardWindow.isDestroyed()) {
     if (dashboardWindow.isMinimized()) dashboardWindow.restore();
     dashboardWindow.focus();
     return;
   }
+  const { width, height } = screen.getPrimaryDisplay().workAreaSize;
   dashboardWindow = new BrowserWindow({
-    width: 1200,
-    height: 900,
+    width: Math.max(1200, Math.min(1600, width - 120)),
+    height: Math.max(900, Math.min(1000, height - 120)),
     autoHideMenuBar: true,
     title: 'Net Worth Tracker',
+    icon: APP_ICON,
     backgroundColor: '#EEF3F9',
     webPreferences: COMMON_WEB_PREFERENCES,
   });
   dashboardWindow.loadFile(path.join(__dirname, 'windows', 'dashboard.html'));
+  dashboardWindow.maximize();
   // Hosted Plaid Link (and any other https link) opens in the system browser,
   // never an Electron child window.
   dashboardWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -202,25 +269,25 @@ function createOrFocusDashboard() {
 // IPC bridge handlers (the only surface exposed to renderers via preload)
 // ---------------------------------------------------------------------------
 
-ipcMain.handle('open-dashboard', () => {
-  createOrFocusDashboard();
-  return true;
-});
-ipcMain.handle('get-settings', () => getSettings());
-ipcMain.handle('set-settings', (_e, partial) => setSettings(partial));
 ipcMain.handle('get-cache', (_e, key) => getCache(String(key)));
 ipcMain.handle('set-cache', (_e, key, value) => setCache(String(key), value));
+ipcMain.handle('get-server-env-status', () => getServerEnvStatus());
+ipcMain.handle('set-server-env', (_e, partial) => setServerEnv(partial));
 
 // ---------------------------------------------------------------------------
 // Lifecycle
 // ---------------------------------------------------------------------------
 
 app.whenReady().then(() => {
+  if (process.platform === 'darwin' && app.dock && fs.existsSync(APP_ICON)) {
+    app.dock.setIcon(nativeImage.createFromPath(APP_ICON));
+  }
   startServer();
-  createMiniWindow();
+  createOrFocusDashboard();
+  scheduleNightlyRefresh();
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createMiniWindow();
+    if (BrowserWindow.getAllWindows().length === 0) createOrFocusDashboard();
   });
 });
 
@@ -228,5 +295,8 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
-app.on('before-quit', stopServer);
+app.on('before-quit', () => {
+  if (nightlyTimer) clearTimeout(nightlyTimer);
+  stopServer();
+});
 process.on('exit', stopServer);

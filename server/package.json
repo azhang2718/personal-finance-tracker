@@ -11,7 +11,7 @@
     "rotate-key": "node scripts/rotate-key.js"
   },
   "dependencies": {
-    "better-sqlite3": "^12.10.0",
+    "better-sqlite3": "^12.11.1",
     "cheerio": "^1.2.0",
     "dotenv": "^16.6.1",
     "express": "^4.22.2",

@@ -1,31 +1,18 @@
 // Shared API client for both renderer windows.
 // Stale-while-revalidate: every GET serves the persisted cache immediately
 // (if present), then revalidates in the background and notifies the
-// subscriber with fresh data. The base URL comes from app settings
-// (default http://127.0.0.1:8123) — never hardcoded elsewhere.
+// subscriber with fresh data.
 //
 // Loaded as a plain script; exposes window.API.
 (function () {
   'use strict';
 
-  let settings = null;
-
-  async function loadSettings() {
-    settings = await window.bridge.getSettings();
-    return settings;
-  }
+  // The API server always runs locally on this fixed address — it's spawned by
+  // the Electron main process on launch. Defined here once; not configurable.
+  const API_BASE_URL = 'http://127.0.0.1:8123';
 
   function baseUrl() {
-    return (settings && settings.apiBaseUrl) || 'http://127.0.0.1:8123';
-  }
-
-  async function init() {
-    await loadSettings();
-  }
-
-  async function setApiBaseUrl(url) {
-    settings = await window.bridge.setSettings({ apiBaseUrl: url });
-    return settings;
+    return API_BASE_URL;
   }
 
   function cacheKey(path) {
@@ -115,25 +102,19 @@
   }
 
   window.API = {
-    init,
     baseUrl,
-    setApiBaseUrl,
-    getSettings: () => settings,
     getSWR,
     fetchJson,
     postJson,
     putJson,
     del,
-    // Convenience endpoints
     health: () => fetchJson('/api/health'),
     refresh: (auto) => postJson(`/api/refresh${auto ? '?auto=true' : ''}`),
     linkToken: () => postJson('/api/plaid/link-token'),
-    exchange: (publicToken, institutionName) =>
-      postJson('/api/plaid/exchange', { public_token: publicToken, institution_name: institutionName }),
     reauthToken: (itemId) => postJson(`/api/plaid/reauth-token/${itemId}`),
     hostedStatus: () => fetchJson('/api/plaid/hosted/status'),
     deleteItem: (itemId) => del(`/api/plaid/items/${itemId}`),
-    setManualCollectibles: (cents) => putJson('/api/collectibles/manual', { balance_cents: cents }),
+    setCollectrSource: (url) => putJson('/api/collectibles/source', { url }),
     exportCsvUrl: () => baseUrl() + '/api/export.csv',
   };
 })();

@@ -86,5 +86,4 @@
 - **Spending UI.** Bar chart = expenses (accent, rounded tops) + income
   (muted grey bars) per month; categories prettified from Plaid's
   SNAKE_CASE primaries, top 8 + aggregated "Other".
-- **Mini window** got only a CSS-level glass treatment (body gradient from
-  tokens + the .mini container as one glass card); mini.js untouched.
+- **Dashboard startup** now opens the full dashboard window directly on launch; the compact mini window has been removed.

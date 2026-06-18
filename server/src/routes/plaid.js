@@ -14,6 +14,7 @@ import {
   upsertSnapshot,
 } from '../db/repository.js';
 import { splitInvestmentSnapshots } from '../plaid/investments.js';
+import { todayStr } from '../util/date.js';
 
 const router = Router();
 
@@ -21,12 +22,7 @@ const router = Router();
 // Chase) on its own HTTPS page, so no local redirect URI is needed —
 // production rejects http:// redirect URIs, which rules out the local
 // resume-page approach for a loopback desktop app.
-// Most recent link token, held in memory so /hosted/status can poll for the
-// session result. Single local user; never persisted.
 let lastLinkToken = null;
-export function getLastLinkToken() {
-  return lastLinkToken;
-}
 
 // Map Plaid account subtypes/types to our types
 function mapPlaidType(plaidType, plaidSubtype) {
@@ -40,10 +36,6 @@ function mapPlaidType(plaidType, plaidSubtype) {
   if (st.includes('credit')) return 'credit';
   if (st.includes('invest') || st.includes('brokerage') || st.includes('401') || st.includes('ira')) return 'investment';
   return 'cash';
-}
-
-function todayStr() {
-  return new Date().toISOString().slice(0, 10);
 }
 
 // POST /api/plaid/link-token
@@ -125,20 +117,6 @@ async function ingestPublicToken(public_token, institution_name) {
   return { item_id: itemId, accounts_created: created.length };
 }
 
-// POST /api/plaid/exchange
-// Body: { public_token, institution_name }
-router.post('/exchange', async (req, res) => {
-  const { public_token, institution_name } = req.body ?? {};
-  if (!public_token) return res.status(400).json({ error: 'public_token is required' });
-
-  try {
-    res.json(await ingestPublicToken(public_token, institution_name));
-  } catch (err) {
-    console.error('[plaid] exchange error:', err.response?.data?.error_message ?? err.message);
-    res.status(500).json({ error: 'Failed to exchange token' });
-  }
-});
-
 // GET /api/plaid/hosted/status
 // Polls the current Hosted Link session. When the user finishes the flow in
 // the browser, ingest the resulting public token and report success.
@@ -172,76 +150,6 @@ router.get('/hosted/status', async (_req, res) => {
     console.error('[plaid] hosted-status error:', err.response?.data?.error_message ?? err.message);
     res.status(500).json({ error: 'Failed to check Link session status' });
   }
-});
-
-// POST /api/plaid/refresh
-// Refreshes balances for all items (or a specific one via body: { item_id })
-router.post('/refresh', async (req, res) => {
-  const specificItemId = req.body?.item_id ?? null;
-  const items = getAllItems();
-  const results = [];
-
-  for (const item of items) {
-    if (specificItemId && item.id !== specificItemId) continue;
-    try {
-      const accessToken = getDecryptedToken(item.id);
-      const client = getPlaidClient();
-
-      const balanceRes = await client.accountsBalanceGet({ access_token: accessToken });
-      const plaidAccounts = balanceRes.data.accounts;
-
-      const today = todayStr();
-      for (const pa of plaidAccounts) {
-        let account = findAccountByPlaidId(pa.account_id);
-        if (!account) {
-          // Create missing account
-          const type = mapPlaidType(pa.type, pa.subtype);
-          const id = createAccount({
-            name: pa.name,
-            source: 'plaid',
-            type,
-            plaidAccountId: pa.account_id,
-            plaidItemId: item.id,
-          });
-          account = { id, type };
-        }
-        const raw = pa.balances?.current ?? 0;
-        const balanceCents = Math.round((account.type === 'credit' ? -Math.abs(raw) : raw) * 100);
-        upsertSnapshot(account.id, today, balanceCents);
-      }
-
-      // Per-asset-class snapshots for investment accounts (graceful fallback)
-      const split = await splitInvestmentSnapshots(client, accessToken, item.id, plaidAccounts, today);
-
-      results.push({
-        item_id: item.id,
-        institution: item.institution_name,
-        status: 'ok',
-        ...(split.split ? { investment_split: split.classes } : {}),
-      });
-    } catch (err) {
-      const errorCode = err.response?.data?.error_code;
-      if (errorCode === 'ITEM_LOGIN_REQUIRED') {
-        markItemNeedsReauth(item.id);
-        results.push({
-          item_id: item.id,
-          institution: item.institution_name,
-          status: 'needs_reauth',
-          message: `${item.institution_name} needs to be reconnected.`,
-        });
-      } else {
-        console.error(`[plaid] refresh error for item ${item.id}:`, err.response?.data?.error_message ?? err.message);
-        results.push({
-          item_id: item.id,
-          institution: item.institution_name,
-          status: 'error',
-          message: 'Refresh failed — try again later.',
-        });
-      }
-    }
-  }
-
-  res.json({ results });
 });
 
 // DELETE /api/plaid/items/:id

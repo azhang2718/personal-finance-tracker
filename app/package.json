@@ -15,7 +15,8 @@
   },
   "devDependencies": {
     "electron": "^42.4.0",
-    "electron-builder": "^26.15.2"
+    "electron-builder": "^26.15.2",
+    "playwright-core": "^1.61.0"
   },
   "build": {
     "appId": "com.local.networth-tracker",
@@ -23,6 +24,7 @@
     "directories": {
       "output": "dist"
     },
+    "beforePack": "./scripts/rebuild-server-native.js",
     "files": [
       "main.js",
       "preload.js",
@@ -33,17 +35,24 @@
     ],
     "extraResources": [
       {
-        "from": "../server",
+        "from": "build-server",
         "to": "server",
         "filter": [
           "**/*",
+          "!node_modules/**",
           "!data/**",
           "!.env",
-          "!*.db"
+          "!*.db",
+          "!**/*.md"
         ]
+      },
+      {
+        "from": "build-server/node_modules",
+        "to": "server/node_modules"
       }
     ],
     "mac": {
+      "icon": "build/icon.icns",
       "target": [
         {
           "target": "dmg",

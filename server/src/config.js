@@ -6,23 +6,34 @@ import path from 'path';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
+// Plaid and the encryption key are only needed to connect bank accounts. They
+// are optional so the server can run in collectibles-only mode (scraping a
+// Collectr share link) without any Plaid setup. When present, they're still
+// validated. Bank-connect routes surface a clear error if Plaid is unconfigured.
 const envSchema = z.object({
-  PLAID_CLIENT_ID: z.string().min(1, 'PLAID_CLIENT_ID is required'),
-  PLAID_SECRET: z.string().min(1, 'PLAID_SECRET is required'),
-  PLAID_ENV: z.enum(['sandbox', 'development', 'production'], {
-    errorMap: () => ({ message: 'PLAID_ENV must be sandbox, development, or production' }),
-  }),
+  PLAID_CLIENT_ID: z.string().min(1).optional(),
+  PLAID_SECRET: z.string().min(1).optional(),
+  PLAID_ENV: z
+    .enum(['sandbox', 'development', 'production'], {
+      errorMap: () => ({ message: 'PLAID_ENV must be sandbox, development, or production' }),
+    })
+    .optional()
+    .default('sandbox'),
   ENCRYPTION_KEY: z
     .string()
-    .min(1, 'ENCRYPTION_KEY is required')
+    .optional()
     .refine((v) => {
+      if (v === undefined || v === '') return true;
       try {
         return Buffer.from(v, 'base64').length === 32;
       } catch {
         return false;
       }
     }, 'ENCRYPTION_KEY must be a base64-encoded 32-byte key'),
-  COLLECTR_SHARE_URL: z.string().url('COLLECTR_SHARE_URL must be a valid URL'),
+  COLLECTR_SHARE_URL: z
+    .string()
+    .url('COLLECTR_SHARE_URL must be a valid URL')
+    .optional(),
   PORT: z
     .string()
     .optional()
@@ -46,10 +57,26 @@ export function loadConfig() {
   }
 
   _config = result.data;
+
+  if (!isPlaidConfigured(_config)) {
+    console.warn(
+      '[config] Plaid is not configured — bank connections are disabled. ' +
+        'Set PLAID_CLIENT_ID, PLAID_SECRET and ENCRYPTION_KEY in server/.env to enable them.'
+    );
+  }
+  if (!_config.COLLECTR_SHARE_URL) {
+    console.warn('[config] COLLECTR_SHARE_URL is not set — collectibles scraping is disabled.');
+  }
+
   return _config;
 }
 
 export function getConfig() {
   if (!_config) return loadConfig();
   return _config;
+}
+
+/** True when Plaid credentials + an encryption key are all present. */
+export function isPlaidConfigured(config = getConfig()) {
+  return Boolean(config.PLAID_CLIENT_ID && config.PLAID_SECRET && config.ENCRYPTION_KEY);
 }

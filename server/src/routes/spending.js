@@ -22,16 +22,14 @@ import {
   getSpendingByMonth,
   getSpendingByCategory,
 } from '../db/repository.js';
+import { todayStr } from '../util/date.js';
+import { categorizeTxn } from '../spending/categorize.js';
 
 const router = Router();
 
 const REFRESH_INTERVAL_MS = 12 * 60 * 60 * 1000;
 const META_REFRESHED_AT = 'transactions_refreshed_at';
 const META_WINDOW_START = 'transactions_window_start';
-
-function todayStr() {
-  return new Date().toISOString().slice(0, 10);
-}
 
 // First day of the month `monthsBack` months before the current month.
 function monthStart(monthsBack) {
@@ -41,14 +39,6 @@ function monthStart(monthsBack) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
   return `${y}-${m}-01`;
-}
-
-function pickCategory(txn) {
-  return (
-    txn.personal_finance_category?.primary ||
-    (Array.isArray(txn.category) && txn.category[0]) ||
-    'Other'
-  );
 }
 
 // Pull all transactions for one item over [startDate, endDate], paginated.
@@ -103,7 +93,7 @@ async function refreshCacheIfNeeded(startDate) {
           date: t.date,
           name: t.name ?? '',
           amountCents: Math.round((t.amount ?? 0) * 100),
-          category: pickCategory(t),
+          category: categorizeTxn(t),
           pending: false,
         });
       }
@@ -170,6 +160,28 @@ router.get('/spending/summary', async (req, res) => {
   } catch (err) {
     console.error('[spending] summary error:', err.message);
     res.status(500).json({ error: 'Failed to load spending summary' });
+  }
+});
+
+// GET /api/spending/by-category?month=YYYY-MM
+// Category breakdown for any single month already in the cache (no Plaid call —
+// the summary endpoint keeps a rolling window cached). Used by the month picker.
+router.get('/spending/by-category', (req, res) => {
+  const month = String(req.query.month || '');
+  if (!/^\d{4}-\d{2}$/.test(month)) {
+    return res.status(400).json({ error: 'month must be YYYY-MM' });
+  }
+  try {
+    const byCategory = getSpendingByCategory(month);
+    const total = byCategory.reduce((a, c) => a + c.cents, 0);
+    res.json({
+      month,
+      expenses_cents: total,
+      by_category: byCategory.map((c) => ({ category: c.category, cents: c.cents })),
+    });
+  } catch (err) {
+    console.error('[spending] by-category error:', err.message);
+    res.status(500).json({ error: 'Failed to load category breakdown' });
   }
 });
 

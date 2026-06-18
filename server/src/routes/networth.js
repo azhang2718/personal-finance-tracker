@@ -7,6 +7,7 @@ import {
 } from '../db/repository.js';
 import { refreshAll } from '../refreshAll.js';
 import { getAllItems } from '../db/repository.js';
+import { toCentralDateStr } from '../util/date.js';
 
 const router = Router();
 
@@ -16,17 +17,17 @@ function getRangeSinceDate(range) {
     case '1m': {
       const d = new Date(now);
       d.setMonth(d.getMonth() - 1);
-      return d.toISOString().slice(0, 10);
+      return toCentralDateStr(d);
     }
     case '3m': {
       const d = new Date(now);
       d.setMonth(d.getMonth() - 3);
-      return d.toISOString().slice(0, 10);
+      return toCentralDateStr(d);
     }
     case '1y': {
       const d = new Date(now);
       d.setFullYear(d.getFullYear() - 1);
-      return d.toISOString().slice(0, 10);
+      return toCentralDateStr(d);
     }
     case 'all':
     default:
@@ -72,7 +73,7 @@ router.get('/networth/current', (req, res) => {
     // 7-day delta: compare to net worth from 7 days ago
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const since7d = sevenDaysAgo.toISOString().slice(0, 10);
+    const since7d = toCentralDateStr(sevenDaysAgo);
     const series7d = getNetWorthSeries(since7d);
 
     let deltaCents = 0;

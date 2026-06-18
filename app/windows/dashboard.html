@@ -2,188 +2,565 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <!-- CSP: local scripts + the Plaid Link loader only. connect-src allows
-       http(s) because the API base URL is user-configurable; the default is
-       loopback. No other remote code. -->
   <meta http-equiv="Content-Security-Policy"
-        content="default-src 'self'; script-src 'self' https://cdn.plaid.com; style-src 'self' 'unsafe-inline'; connect-src http: https:; frame-src https://cdn.plaid.com; img-src 'self' data:;" />
-  <title>Net Worth Tracker</title>
+        content="default-src 'self'; script-src 'self' https://cdn.plaid.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src http: https:; frame-src https://cdn.plaid.com; img-src 'self' data:;" />
+  <title>Finance Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../shared/tokens.css" />
   <link rel="stylesheet" href="dashboard.css" />
 </head>
 <body>
+
+  <!-- Background decorations -->
+  <div class="bg-grid" aria-hidden="true"></div>
+  <div class="bg-glow-a" aria-hidden="true"></div>
+  <div class="bg-glow-b" aria-hidden="true"></div>
+
   <div class="layout">
 
-    <!-- ============ Sidebar nav ============ -->
-    <aside class="sidebar glass-card">
-      <p class="eyebrow app-name">Net worth tracker</p>
+    <!-- ============ SIDEBAR ============ -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-icon">
+          <div class="brand-icon-dot"></div>
+        </div>
+        <div class="brand-text">personal finance</div>
+      </div>
+
       <nav class="side-nav" aria-label="Sections">
-        <button class="nav-btn active" data-tab="summary" aria-current="page">Summary</button>
-        <button class="nav-btn" data-tab="networth">Net worth</button>
-        <button class="nav-btn" data-tab="spending">Spending</button>
-        <button class="nav-btn" data-tab="settings">Settings</button>
+        <button class="nav-btn active" data-tab="dashboard" aria-current="page">
+          <span class="nav-bar"></span>
+          <span class="nav-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M3 13h8V3H3zM13 21h8V3h-8zM3 21h8v-6H3z"/></svg>
+          </span>
+          <span class="nav-label">Dashboard</span>
+        </button>
+        <button class="nav-btn" data-tab="networth">
+          <span class="nav-bar"></span>
+          <span class="nav-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+          </span>
+          <span class="nav-label">Net Worth</span>
+        </button>
+        <button class="nav-btn" data-tab="spending">
+          <span class="nav-bar"></span>
+          <span class="nav-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="2" y="5" width="20" height="14" rx="2.5"/><path d="M2 10h20"/></svg>
+          </span>
+          <span class="nav-label">Spending</span>
+        </button>
+        <button class="nav-btn" data-tab="summary">
+          <span class="nav-bar"></span>
+          <span class="nav-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M3 3v18h18"/><path d="M7 14l3-4 3 3 4-6"/></svg>
+          </span>
+          <span class="nav-label">Summary</span>
+        </button>
+        <button class="nav-btn" data-tab="settings">
+          <span class="nav-bar"></span>
+          <span class="nav-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </span>
+          <span class="nav-label">Settings</span>
+        </button>
       </nav>
+
+      <div class="sidebar-spacer"></div>
+
+      <!-- Health Score card -->
+      <div class="health-card">
+        <div class="health-shimmer" aria-hidden="true"></div>
+        <div class="health-body">
+          <div class="eyebrow" style="color:var(--accent)">Health Score</div>
+          <div class="health-num-row">
+            <span class="health-num" id="health-number">—</span>
+            <span class="soft" style="font-size:12px">/ 100</span>
+          </div>
+          <div class="health-track">
+            <div class="health-fill" id="health-fill" style="width:0%"></div>
+          </div>
+          <div class="health-status soft" id="health-status">Calculating…</div>
+        </div>
+      </div>
     </aside>
 
-    <!-- ============ Content area ============ -->
-    <main class="content" id="page">
+    <!-- ============ MAIN ============ -->
+    <main class="main-content">
 
-      <!-- Empty state (fresh install) -->
+      <!-- Topbar -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <div class="today-eyebrow eyebrow" id="today-label"></div>
+          <h1 class="page-title" id="page-title">Net Worth Overview</h1>
+        </div>
+        <div class="topbar-right">
+          <button class="icon-btn" id="refresh-btn" title="Refresh data">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+            <span class="icon-btn-dot"></span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Empty state -->
       <section id="empty-state" class="empty-state" hidden>
-        <p class="eyebrow">Net worth tracker</p>
-        <p class="empty-line">Connect your first account to start tracking.</p>
+        <div class="empty-icon">
+          <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        </div>
+        <h2 class="empty-title">Connect your first account</h2>
+        <p class="empty-sub soft">Link a bank account to start tracking your net worth.</p>
         <button class="btn-primary" id="empty-connect">Connect bank</button>
-        <button class="btn-text" id="empty-manual">Add collectibles manually</button>
       </section>
 
       <div id="dashboard" hidden>
         <p id="global-error" class="error-line" hidden></p>
 
-        <!-- ============ Tab: Summary ============ -->
-        <section class="tab" id="tab-summary">
-          <div class="glass-card hero-card">
-            <div class="hero-card-top">
-              <span class="eyebrow">Total balance</span>
-              <button class="btn-pill" id="refresh-btn">⟳ Refresh</button>
+        <!-- ====== TAB: DASHBOARD ====== -->
+        <section class="tab" id="tab-dashboard">
+
+          <!-- Hero row -->
+          <div class="hero-row">
+
+            <!-- Net worth chart card -->
+            <section class="glass-card nw-card">
+              <div class="nw-card-head">
+                <div>
+                  <div class="eyebrow">Total net worth</div>
+                  <div class="nw-headline-row">
+                    <span class="nw-figure num" id="hero-figure"><span class="skeleton">$000,000</span></span>
+                    <span class="growth-badge" id="hero-growth-badge" hidden></span>
+                  </div>
+                  <div class="nw-sub" id="hero-sub"><span class="skeleton" style="display:inline-block;width:180px">&nbsp;</span></div>
+                </div>
+                <div class="range-group" role="radiogroup" aria-label="Chart range">
+                  <button class="range-btn" role="radio" aria-checked="false" data-range="1m">1M</button>
+                  <button class="range-btn" role="radio" aria-checked="false" data-range="3m">3M</button>
+                  <button class="range-btn active" role="radio" aria-checked="true" data-range="1y">1Y</button>
+                  <button class="range-btn" role="radio" aria-checked="false" data-range="all">All</button>
+                </div>
+              </div>
+              <div class="chart-box">
+                <canvas id="series-chart" aria-label="Net worth over time"></canvas>
+              </div>
+              <div class="chart-legend">
+                <div class="legend-item"><span class="legend-line"></span>Net worth</div>
+              </div>
+            </section>
+
+            <!-- Side rail KPIs -->
+            <div class="rail-kpis">
+              <div class="glass-card rail-card">
+                <div class="rail-top">
+                  <span class="eyebrow">Monthly Spend</span>
+                  <span class="trend-badge" id="rail-spend-badge">—</span>
+                </div>
+                <div class="rail-val num" id="rail-spend"><span class="skeleton">$0,000</span></div>
+                <div class="mini-bars" id="rail-spend-bars"></div>
+              </div>
+              <div class="glass-card rail-card">
+                <div class="rail-top">
+                  <span class="eyebrow">Savings Rate</span>
+                  <span class="trend-badge pos" id="rail-savings-badge">—</span>
+                </div>
+                <div class="rail-val num" id="rail-savings"><span class="skeleton">—%</span></div>
+                <div class="mini-bars" id="rail-savings-bars"></div>
+              </div>
+              <div class="glass-card rail-card">
+                <div class="rail-top">
+                  <span class="eyebrow">Free Cash Flow</span>
+                  <span class="trend-badge pos" id="rail-fcf-badge">—</span>
+                </div>
+                <div class="rail-val num" id="rail-fcf"><span class="skeleton">$0,000</span></div>
+                <div class="mini-bars" id="rail-fcf-bars"></div>
+              </div>
             </div>
-            <div class="hero-figure num" id="hero-figure" aria-live="polite"><span class="skeleton">$000,000.00</span></div>
-            <div class="delta-line" id="delta-line"><span class="skeleton">▲ $0,000.00 (+0.0%) past 7 days</span></div>
-            <p class="num soft small refreshed-line" id="refreshed-at"></p>
           </div>
 
-          <div class="summary-grid">
-            <div class="glass-card spark-card">
-              <span class="eyebrow">Past 30 days</span>
-              <div class="spark-box"><canvas id="summary-spark" aria-label="30-day net worth sparkline"></canvas></div>
+          <!-- KPI strip -->
+          <div class="kpi-strip">
+            <div class="glass-card kpi-card">
+              <div class="kpi-head">
+                <span class="kpi-icon kpi-icon-emerald">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M17 7h4v4"/></svg>
+                </span>
+                <span class="eyebrow">YTD Growth</span>
+              </div>
+              <div class="kpi-val num" id="kpi-ytd-val"><span class="skeleton">$00,000</span></div>
+              <div class="kpi-meta"><span class="kpi-trend pos" id="kpi-ytd-pct">—</span><span class="kpi-sub soft" id="kpi-ytd-sub">vs start of year</span></div>
             </div>
-            <div class="glass-card quickstats-card">
-              <span class="eyebrow">This month</span>
-              <div class="quickstat">
-                <span class="soft">Spent</span>
-                <span class="num" id="qs-spend"><span class="skeleton">$0,000.00</span></span>
+            <div class="glass-card kpi-card">
+              <div class="kpi-head">
+                <span class="kpi-icon kpi-icon-cyan">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                </span>
+                <span class="eyebrow">Investments</span>
               </div>
-              <div class="quickstat">
-                <span class="soft">Income</span>
-                <span class="num" id="qs-income"><span class="skeleton">$0,000.00</span></span>
+              <div class="kpi-val num" id="kpi-invest-val"><span class="skeleton">$00,000</span></div>
+              <div class="kpi-meta"><span class="kpi-trend" id="kpi-invest-pct">—</span><span class="kpi-sub soft">portfolio value</span></div>
+            </div>
+            <div class="glass-card kpi-card">
+              <div class="kpi-head">
+                <span class="kpi-icon kpi-icon-neutral">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
+                </span>
+                <span class="eyebrow">Credit</span>
               </div>
+              <div class="kpi-val num" id="kpi-credit-val"><span class="skeleton">$0,000</span></div>
+              <div class="kpi-meta"><span class="kpi-trend" id="kpi-credit-trend">—</span><span class="kpi-sub soft">outstanding</span></div>
+            </div>
+            <div class="glass-card kpi-card">
+              <div class="kpi-head">
+                <span class="kpi-icon kpi-icon-cyan">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2s4 4 4 8a4 4 0 0 1-8 0c0-1.5.5-2.5.5-2.5"/></svg>
+                </span>
+                <span class="eyebrow">Monthly Spend</span>
+              </div>
+              <div class="kpi-val num" id="kpi-burn-val"><span class="skeleton">$0,000/mo</span></div>
+              <div class="kpi-meta"><span class="kpi-trend cyan" id="kpi-burn-trend">—</span><span class="kpi-sub soft">avg monthly</span></div>
             </div>
           </div>
 
-          <div class="glass-card accounts-card">
-            <h2 class="eyebrow section-label">Accounts</h2>
+          <!-- Bottom row -->
+          <div class="bottom-row">
+
+            <!-- Allocation donut -->
+            <section class="glass-card alloc-card">
+              <div class="card-title">Asset Allocation</div>
+              <div class="card-sub soft" id="alloc-sub">Across accounts</div>
+              <div class="donut-wrap">
+                <div class="donut-box-wrap">
+                  <canvas id="donut-chart" aria-label="Allocation by asset class"></canvas>
+                  <div class="donut-center">
+                    <div class="eyebrow">Total</div>
+                    <div class="donut-center-val num" id="donut-center-val">—</div>
+                  </div>
+                </div>
+              </div>
+              <ul class="alloc-legend" id="allocation-legend"></ul>
+            </section>
+
+            <!-- Cash flow -->
+            <section class="glass-card cashflow-card">
+              <div class="cashflow-head">
+                <div>
+                  <div class="card-title">Cash Flow</div>
+                  <div class="card-sub soft">Income vs expenses · 6 mo</div>
+                </div>
+                <div class="cashflow-avg">
+                  <div class="eyebrow">Avg net / mo</div>
+                  <div class="cashflow-avg-val num pos" id="cf-net-avg">—</div>
+                </div>
+              </div>
+              <div class="cashflow-chart-box">
+                <canvas id="cashflow-chart" aria-label="Cash flow chart"></canvas>
+              </div>
+              <div class="chart-legend">
+                <div class="legend-item"><span class="legend-swatch emerald"></span>Income <span class="num soft" id="cf-income-avg">—</span>/mo</div>
+                <div class="legend-item"><span class="legend-swatch neutral"></span>Expenses <span class="num soft" id="cf-expense-avg">—</span>/mo</div>
+              </div>
+            </section>
+
+            <!-- AI insights -->
+            <section class="glass-card ai-card">
+              <div class="ai-head">
+                <div class="ai-icon-wrap">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#06080b" stroke-width="2.2"><path d="M12 3v3m0 12v3m9-9h-3M6 12H3m13.5-6.5-2 2m-9 9 2-2m9 0 2 2m-13-13 2 2"/><circle cx="12" cy="12" r="3.4"/></svg>
+                </div>
+                <div>
+                  <div class="ai-name">AI Insights</div>
+                  <div class="ai-status">
+                    <span class="ai-dot"></span>Analyzing your finances
+                  </div>
+                </div>
+              </div>
+              <div class="ai-insights" id="ai-insights">
+                <div class="ai-insight-card" style="border-color:rgba(255,255,255,0.06)">
+                  <div class="skeleton" style="height:12px;width:60px;border-radius:4px;margin-bottom:8px"></div>
+                  <div class="skeleton" style="height:12px;width:100%;border-radius:4px;margin-bottom:6px"></div>
+                  <div class="skeleton" style="height:12px;width:80%;border-radius:4px"></div>
+                </div>
+              </div>
+              <form class="ai-ask" id="ai-ask-form">
+                <input type="text" id="ai-ask-input" class="ai-ask-input" placeholder="Ask about your money…" autocomplete="off" />
+                <button type="submit" class="ai-send" id="ai-send" aria-label="Ask">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#06080b" stroke-width="2.4"><path d="M5 12h14m-6-6 6 6-6 6"/></svg>
+                </button>
+              </form>
+            </section>
+          </div>
+        </section>
+
+        <!-- ====== TAB: NET WORTH ====== -->
+        <section class="tab" id="tab-networth" hidden>
+
+          <!-- History chart card -->
+          <section class="glass-card nw-history-card">
+            <div class="history-head">
+              <div>
+                <div class="card-title">Net Worth Over Time</div>
+                <div class="card-sub soft">Complete history · <span class="num" id="nw-refreshed-at"></span></div>
+              </div>
+              <div class="range-group" role="radiogroup" aria-label="Net worth history range">
+                <button class="range-btn" role="radio" aria-checked="false" data-range3="1m">1M</button>
+                <button class="range-btn" role="radio" aria-checked="false" data-range3="3m">3M</button>
+                <button class="range-btn" role="radio" aria-checked="false" data-range3="1y">1Y</button>
+                <button class="range-btn active" role="radio" aria-checked="true" data-range3="all">All</button>
+              </div>
+            </div>
+            <div class="chart-box" style="height:280px; margin-top:20px">
+              <canvas id="nw-chart" aria-label="Net worth history"></canvas>
+            </div>
+          </section>
+
+          <!-- Stats strip -->
+          <div class="nw-stats-strip" id="nw-stats-strip"></div>
+
+          <!-- Monthly snapshot + milestones -->
+          <div class="nw-bottom-row">
+            <section class="glass-card nw-monthly-card">
+              <div class="card-title">Monthly Snapshot</div>
+              <div class="card-sub soft" style="margin-bottom:16px">Full month-over-month breakdown</div>
+              <div class="nw-monthly-table" id="nw-monthly-table"></div>
+            </section>
+            <section class="glass-card milestones-card">
+              <div class="card-title">Milestones</div>
+              <div class="card-sub soft" style="margin-bottom:16px">Net worth checkpoints</div>
+              <div class="milestones-list" id="milestones-list"></div>
+            </section>
+          </div>
+        </section>
+
+        <!-- ====== TAB: SPENDING ====== -->
+        <section class="tab" id="tab-spending" hidden>
+
+          <!-- Spend KPI strip -->
+          <div class="kpi-strip">
+            <div class="glass-card kpi-card">
+              <div class="eyebrow">Spent This Month</div>
+              <div class="kpi-val num" id="spend-month-figure"><span class="skeleton">$0,000</span></div>
+              <div class="kpi-meta"><span class="kpi-sub soft">total expenses</span></div>
+            </div>
+            <div class="glass-card kpi-card">
+              <div class="eyebrow">Income This Month</div>
+              <div class="kpi-val num" id="qs-income"><span class="skeleton">$0,000</span></div>
+              <div class="kpi-meta"><span class="kpi-sub soft">gross income</span></div>
+            </div>
+            <div class="glass-card kpi-card">
+              <div class="eyebrow">Daily Average</div>
+              <div class="kpi-val num" id="qs-daily"><span class="skeleton">$000</span></div>
+              <div class="kpi-meta"><span class="kpi-sub soft">per day</span></div>
+            </div>
+            <div class="glass-card kpi-card">
+              <div class="eyebrow">Net Saved</div>
+              <div class="kpi-val num pos" id="qs-saved"><span class="skeleton">$0,000</span></div>
+              <div class="kpi-meta"><span class="kpi-sub soft">income − expenses</span></div>
+            </div>
+          </div>
+
+          <!-- Category + chart row -->
+          <div class="spend-row">
+            <section class="glass-card cat-card">
+              <div class="spend-card-head">
+                <div>
+                  <div class="card-title">Spending by Category</div>
+                  <div class="card-sub soft"><span id="month-spend-total">—</span> total</div>
+                </div>
+                <select class="month-select" id="month-select" aria-label="Select month"></select>
+              </div>
+              <div class="category-list" id="category-list"></div>
+            </section>
+
+            <section class="glass-card spending-chart-card">
+              <div class="card-title">Monthly History</div>
+              <div class="card-sub soft">Income &amp; expenses · last 6 months</div>
+              <div class="bar-box">
+                <canvas id="spending-chart" aria-label="Monthly expenses and income, last 6 months"></canvas>
+              </div>
+              <div class="chart-legend" style="margin-top:14px">
+                <div class="legend-item"><span class="legend-swatch emerald"></span>Income</div>
+                <div class="legend-item"><span class="legend-swatch neutral"></span>Expenses</div>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <!-- ====== TAB: SUMMARY ====== -->
+        <section class="tab" id="tab-summary" hidden>
+
+          <div class="summary-top-row">
+            <!-- Assets & Liabilities -->
+            <section class="glass-card balance-card">
+              <div class="card-title">Assets &amp; Liabilities</div>
+              <div class="card-sub soft">What you own vs what you owe</div>
+              <div class="balance-totals">
+                <div class="balance-box emerald-border">
+                  <div class="eyebrow" style="color:var(--accent)">Total assets</div>
+                  <div class="balance-val num" id="total-assets">—</div>
+                </div>
+                <div class="balance-box">
+                  <div class="eyebrow" style="color:var(--neg)">Total liabilities</div>
+                  <div class="balance-val num" id="total-liabilities">—</div>
+                </div>
+              </div>
+              <div class="balance-rows" id="balance-rows"></div>
+            </section>
+
+            <!-- Projections -->
+            <section class="glass-card proj-card">
+              <div class="card-title">Wealth Projection</div>
+              <div class="card-sub soft" id="proj-sub">At your current growth rate</div>
+              <div class="proj-list" id="proj-list"></div>
+
+              <div class="coastfi" id="coastfi">
+                <div class="coastfi-head">
+                  <div>
+                    <div class="coastfi-label">Coast-FI retirement age</div>
+                    <div class="coastfi-detail soft" id="coastfi-detail">Set your age to project</div>
+                  </div>
+                  <div class="coastfi-age num" id="coastfi-age">—</div>
+                </div>
+                <div class="coastfi-agerow">
+                  <label class="soft" for="age-input">Current age</label>
+                  <input type="number" id="age-input" min="14" max="90" step="1" inputmode="numeric" placeholder="—" />
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <!-- Net worth history (full chart) -->
+          <section class="glass-card history-card">
+            <div class="history-head">
+              <div>
+                <div class="card-title">Net Worth Over Time</div>
+                <div class="card-sub soft">Complete history · <span class="num" id="refreshed-at"></span></div>
+              </div>
+              <div class="range-group" role="radiogroup" aria-label="History range">
+                <button class="range-btn" role="radio" aria-checked="false" data-range2="1m">1M</button>
+                <button class="range-btn" role="radio" aria-checked="false" data-range2="3m">3M</button>
+                <button class="range-btn" role="radio" aria-checked="false" data-range2="1y">1Y</button>
+                <button class="range-btn active" role="radio" aria-checked="true" data-range2="all">All</button>
+              </div>
+            </div>
+            <div class="chart-box" style="height:260px">
+              <canvas id="history-chart" aria-label="Net worth history"></canvas>
+            </div>
+          </section>
+
+          <!-- Accounts -->
+          <section class="glass-card accts-card">
+            <div class="card-title">Accounts</div>
             <table class="accounts-table" id="accounts-table">
               <tbody id="accounts-tbody"></tbody>
             </table>
-          </div>
+          </section>
         </section>
 
-        <!-- ============ Tab: Net worth ============ -->
-        <section class="tab" id="tab-networth" hidden>
-          <div class="glass-card nw-card">
-            <div class="hero-card-top">
-              <span class="eyebrow">Net worth</span>
-            </div>
-            <div class="hero-figure num" id="nw-figure"><span class="skeleton">$000,000.00</span></div>
-            <div class="delta-line" id="nw-delta-line"><span class="skeleton">▲ $0,000.00 (+0.0%) past 7 days</span></div>
-            <div class="chart-box"><canvas id="series-chart" aria-label="Net worth over time"></canvas></div>
-            <div class="range-toggles" role="radiogroup" aria-label="Chart range">
-              <button class="range-btn" role="radio" aria-checked="false" data-range="1m">1M</button>
-              <button class="range-btn" role="radio" aria-checked="false" data-range="3m">3M</button>
-              <button class="range-btn" role="radio" aria-checked="false" data-range="1y">1Y</button>
-              <button class="range-btn active" role="radio" aria-checked="true" data-range="all">All</button>
-            </div>
-          </div>
-
-          <div class="glass-card allocation-card">
-            <h2 class="eyebrow section-label">Allocation</h2>
-            <div class="alloc-flex">
-              <div class="donut-box"><canvas id="donut-chart" aria-label="Allocation by asset class"></canvas></div>
-              <div class="alloc-right">
-                <ul class="legend" id="allocation-legend"></ul>
-                <p class="num small soft" id="credit-offset"></p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <!-- ============ Tab: Spending ============ -->
-        <section class="tab" id="tab-spending" hidden>
-          <div class="glass-card spending-chart-card">
-            <h2 class="eyebrow section-label">Monthly expenses</h2>
-            <div class="bar-box"><canvas id="spending-chart" aria-label="Monthly expenses and income, last 6 months"></canvas></div>
-          </div>
-
-          <div class="spending-grid">
-            <div class="glass-card month-card">
-              <span class="eyebrow">This month</span>
-              <div class="month-figure num" id="spend-month-figure"><span class="skeleton">$0,000.00</span></div>
-              <p class="soft small">spent so far</p>
-              <p class="num" id="spend-month-income"><span class="skeleton">$0,000.00 income</span></p>
-            </div>
-            <div class="glass-card categories-card">
-              <h2 class="eyebrow section-label">By category</h2>
-              <ul class="category-list" id="category-list"></ul>
-            </div>
-          </div>
-        </section>
-
-        <!-- ============ Tab: Settings ============ -->
+        <!-- ====== TAB: SETTINGS ====== -->
         <section class="tab" id="tab-settings" hidden>
-          <div class="glass-card settings-card">
-            <h2 class="eyebrow section-label">Connections</h2>
-            <div class="settings-row">
-              <span class="settings-label">Banks</span>
-              <span class="settings-control">
-                <button class="btn-primary" id="connect-bank">Connect bank</button>
-                <span id="item-actions"></span>
-              </span>
-            </div>
-            <div class="settings-row" id="disconnect-confirm-row" hidden>
-              <span class="settings-label"></span>
-              <span class="settings-control confirm-block">
-                <span id="disconnect-confirm-text"></span>
-                <input type="text" id="disconnect-confirm-input" aria-label="Type institution name to confirm" />
-                <button class="btn-danger" id="disconnect-confirm-btn" disabled>Disconnect &amp; delete</button>
-                <button class="btn-text" id="disconnect-cancel-btn">Cancel</button>
-              </span>
-            </div>
-          </div>
+          <div class="settings-layout">
 
-          <div class="glass-card settings-card">
-            <h2 class="eyebrow section-label">Collectibles</h2>
-            <div class="settings-row">
-              <span class="settings-label">Collectibles share link</span>
-              <span class="settings-control num small" id="collectr-url">—</span>
-            </div>
-            <div class="settings-row">
-              <label class="settings-label" for="manual-collectibles">Collectibles value</label>
-              <span class="settings-control">
-                <input type="number" id="manual-collectibles" min="0" step="0.01" placeholder="0.00" />
-                <button class="btn-text" id="manual-save">Save</button>
-                <span class="small soft" id="manual-status"></span>
-              </span>
-            </div>
-          </div>
+            <div class="settings-left">
+              <section class="glass-card settings-card">
+                <div class="card-title">Bank Connection (Plaid)</div>
+                <div class="card-sub soft" style="margin-bottom:6px">Paste your Plaid API keys to enable bank linking. <a href="https://dashboard.plaid.com/signup" target="_blank" rel="noopener" style="color:var(--accent)">Get keys →</a></div>
+                <div class="settings-row">
+                  <span class="settings-label">Status</span>
+                  <span class="settings-control small" id="plaid-status"><span class="dot stale"></span> Checking…</span>
+                </div>
+                <div class="settings-row">
+                  <label class="settings-label" for="plaid-env">Environment</label>
+                  <span class="settings-control">
+                    <select id="plaid-env">
+                      <option value="sandbox">Sandbox (test banks)</option>
+                      <option value="production">Production (real banks)</option>
+                    </select>
+                  </span>
+                </div>
+                <div class="settings-row">
+                  <label class="settings-label" for="plaid-client-id">Client ID</label>
+                  <span class="settings-control">
+                    <input type="text" id="plaid-client-id" spellcheck="false" placeholder="Plaid client_id" />
+                  </span>
+                </div>
+                <div class="settings-row">
+                  <label class="settings-label" for="plaid-secret">Secret</label>
+                  <span class="settings-control">
+                    <input type="password" id="plaid-secret" spellcheck="false" placeholder="Plaid secret" />
+                    <button class="btn-text" id="plaid-save">Save &amp; restart</button>
+                    <span class="small soft" id="plaid-save-status"></span>
+                  </span>
+                </div>
+              </section>
 
-          <div class="glass-card settings-card">
-            <h2 class="eyebrow section-label">Data</h2>
-            <div class="settings-row">
-              <span class="settings-label">Export</span>
-              <span class="settings-control">
-                <button class="btn-pill" id="export-csv">Export CSV</button>
-              </span>
+              <section class="glass-card settings-card">
+                <div class="card-title">Connections</div>
+                <div class="settings-row">
+                  <span class="settings-label">Banks</span>
+                  <span class="settings-control">
+                    <button class="btn-primary" id="connect-bank">Connect bank</button>
+                  </span>
+                </div>
+                <div class="bank-list" id="item-actions"></div>
+                <div class="settings-row" id="disconnect-confirm-row" hidden>
+                  <span class="settings-label"></span>
+                  <span class="settings-control confirm-block">
+                    <span id="disconnect-confirm-text"></span>
+                    <input type="text" id="disconnect-confirm-input" aria-label="Type institution name to confirm" />
+                    <button class="btn-danger" id="disconnect-confirm-btn" disabled>Disconnect &amp; delete</button>
+                    <button class="btn-text" id="disconnect-cancel-btn">Cancel</button>
+                  </span>
+                </div>
+              </section>
+
+              <section class="glass-card settings-card">
+                <div class="card-title">Collectibles</div>
+                <div class="settings-row">
+                  <span class="settings-label">Source</span>
+                  <span class="settings-control small">
+                    <span class="dot ok"></span> Auto-synced from Collectr
+                  </span>
+                </div>
+                <div class="settings-row">
+                  <label class="settings-label" for="collectr-url-input">Share link</label>
+                  <span class="settings-control">
+                    <input type="url" id="collectr-url-input" spellcheck="false" placeholder="https://app.getcollectr.com/showcase/profile/@you" />
+                    <button class="btn-text" id="collectr-save">Save</button>
+                    <span class="small soft" id="collectr-status"></span>
+                  </span>
+                </div>
+                <div class="settings-row">
+                  <span class="settings-label">Current value</span>
+                  <span class="settings-control num small" id="collectr-value">—</span>
+                </div>
+              </section>
+
+              <section class="glass-card settings-card">
+                <div class="card-title">Data</div>
+                <div class="settings-row">
+                  <span class="settings-label">Export</span>
+                  <span class="settings-control">
+                    <button class="btn-pill" id="export-csv">Export CSV</button>
+                  </span>
+                </div>
+              </section>
             </div>
-            <div class="settings-row">
-              <label class="settings-label" for="api-base-url">API base URL</label>
-              <span class="settings-control">
-                <input type="url" id="api-base-url" spellcheck="false" />
-                <button class="btn-text" id="api-base-save">Save</button>
-                <span class="small soft" id="api-base-status"></span>
-              </span>
-            </div>
+
+            <!-- Preferences -->
+            <section class="glass-card pref-card">
+              <div class="card-title">Preferences</div>
+              <div class="card-sub soft">Control how the app works for you</div>
+              <div class="pref-list" id="pref-list"></div>
+              <div class="pref-actions">
+                <button class="btn-primary" id="pref-save">Save changes</button>
+                <button class="btn-pill" id="export-csv-2">Export data</button>
+              </div>
+            </section>
+
           </div>
         </section>
-      </div>
+
+      </div><!-- /#dashboard -->
     </main>
   </div>
 

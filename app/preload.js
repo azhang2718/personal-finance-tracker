@@ -3,9 +3,8 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('bridge', {
-  openDashboard: () => ipcRenderer.invoke('open-dashboard'),
-  getSettings: () => ipcRenderer.invoke('get-settings'),
-  setSettings: (partial) => ipcRenderer.invoke('set-settings', partial),
   getCache: (key) => ipcRenderer.invoke('get-cache', key),
   setCache: (key, value) => ipcRenderer.invoke('set-cache', key, value),
+  getServerEnvStatus: () => ipcRenderer.invoke('get-server-env-status'),
+  setServerEnv: (partial) => ipcRenderer.invoke('set-server-env', partial),
 });
