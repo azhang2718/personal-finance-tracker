@@ -753,6 +753,7 @@
     'Fees':              '#9aa4b0',
     'Loan Payments':     '#9aa4b0',
     'P2P':               '#c084fc',
+    'Bank Transfer':     '#60a5fa',
     'Other':             '#5b6573',
   };
 
@@ -776,6 +777,7 @@
     'Fees':              '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
     'Loan Payments':     '<rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/>',
     'P2P':               '<path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>',
+    'Bank Transfer':     '<path d="M3 21h18"/><path d="M5 21V10M19 21V10M9 21V10M15 21V10"/><path d="M12 3 3 8h18z"/>',
     'Other':             '<path d="M20.6 13.4 12 22l-9-9V3h10z"/><circle cx="7.5" cy="7.5" r="1.5"/>',
   };
 

@@ -95,5 +95,15 @@ export function runMigrations() {
     db.exec(`ALTER TABLE accounts ADD COLUMN asset_class TEXT NULL`);
   }
 
+  // Idempotent column add: mask (account's last 2–4 digits, from Plaid). Used to
+  // tell an internal transfer between your own accounts (excluded from spending)
+  // from an external one — i.e. someone paying you — which counts as income.
+  const hasMask = db
+    .prepare(`SELECT COUNT(*) AS n FROM pragma_table_info('accounts') WHERE name = 'mask'`)
+    .get().n > 0;
+  if (!hasMask) {
+    db.exec(`ALTER TABLE accounts ADD COLUMN mask TEXT NULL`);
+  }
+
   console.log('[db] Migrations complete');
 }

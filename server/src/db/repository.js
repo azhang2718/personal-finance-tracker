@@ -153,13 +153,33 @@ export function deleteItem(itemId) {
 /**
  * Creates an account row.
  */
-export function createAccount({ name, source, type, plaidAccountId, plaidItemId, assetClass }) {
+export function createAccount({ name, source, type, plaidAccountId, plaidItemId, assetClass, mask }) {
   const db = getDb();
   const result = db.prepare(`
-    INSERT INTO accounts (name, source, type, plaid_account_id, plaid_item_id, asset_class)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).run(name, source, type, plaidAccountId ?? null, plaidItemId ?? null, assetClass ?? null);
+    INSERT INTO accounts (name, source, type, plaid_account_id, plaid_item_id, asset_class, mask)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(name, source, type, plaidAccountId ?? null, plaidItemId ?? null, assetClass ?? null, mask ?? null);
   return result.lastInsertRowid;
+}
+
+/**
+ * Sets an account's mask (its last 2–4 digits, from Plaid). No-op for a falsy
+ * mask so we never clobber a known value with null.
+ */
+export function setAccountMask(accountId, mask) {
+  if (!mask) return;
+  const db = getDb();
+  db.prepare(`UPDATE accounts SET mask = ? WHERE id = ?`).run(String(mask), accountId);
+}
+
+/**
+ * Set of your own accounts' masks (digits only), used to tell an internal
+ * transfer from an external one during categorization.
+ */
+export function getOwnAccountMasks() {
+  const db = getDb();
+  const rows = db.prepare(`SELECT mask FROM accounts WHERE mask IS NOT NULL AND mask != ''`).all();
+  return new Set(rows.map((r) => String(r.mask).replace(/\D/g, '')).filter(Boolean));
 }
 
 /**
@@ -259,12 +279,13 @@ export function upsertTransaction({ id, accountId, date, name, amountCents, cate
  */
 export function recategorizeAllTransactions() {
   const db = getDb();
+  const ownMasks = getOwnAccountMasks();
   const rows = db.prepare('SELECT id, name, category FROM transactions_cache').all();
   const update = db.prepare('UPDATE transactions_cache SET category = ? WHERE id = ?');
   let changed = 0;
   const tx = db.transaction(() => {
     for (const r of rows) {
-      const next = cleanCategory(r.category, '', r.name);
+      const next = cleanCategory(r.category, '', r.name, ownMasks);
       if (next !== r.category) {
         update.run(next, r.id);
         changed++;

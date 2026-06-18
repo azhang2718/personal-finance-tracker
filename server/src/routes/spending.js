@@ -21,6 +21,7 @@ import {
   setMeta,
   getSpendingByMonth,
   getSpendingByCategory,
+  getOwnAccountMasks,
 } from '../db/repository.js';
 import { todayStr } from '../util/date.js';
 import { categorizeTxn } from '../spending/categorize.js';
@@ -72,6 +73,7 @@ async function refreshCacheIfNeeded(startDate) {
   const client = getPlaidClient();
   const endDate = todayStr();
   const items = getAllItems();
+  const ownMasks = getOwnAccountMasks();
   let anySucceeded = false;
   const errors = [];
 
@@ -93,7 +95,7 @@ async function refreshCacheIfNeeded(startDate) {
           date: t.date,
           name: t.name ?? '',
           amountCents: Math.round((t.amount ?? 0) * 100),
-          category: categorizeTxn(t),
+          category: categorizeTxn(t, ownMasks),
           pending: false,
         });
       }

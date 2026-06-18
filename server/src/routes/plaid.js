@@ -94,6 +94,7 @@ async function ingestPublicToken(public_token, institution_name) {
         type,
         plaidAccountId: pa.account_id,
         plaidItemId: itemId,
+        mask: pa.mask,
       });
       created.push({ id, name: pa.name, type });
     }

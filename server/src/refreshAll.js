@@ -7,6 +7,8 @@ import {
   upsertSnapshot,
   markItemNeedsReauth,
   getOrCreateCollectiblesAccount,
+  setAccountMask,
+  recategorizeAllTransactions,
   logRefresh,
 } from './db/repository.js';
 import { scrapeCollectr } from './collectr/scrape.js';
@@ -53,8 +55,13 @@ async function refreshPlaid() {
             type,
             plaidAccountId: pa.account_id,
             plaidItemId: item.id,
+            mask: pa.mask,
           });
           account = { id, type };
+        } else {
+          // Backfill/refresh the mask on existing accounts (needed to classify
+          // internal vs external transfers).
+          setAccountMask(account.id, pa.mask);
         }
         const raw = pa.balances?.current ?? 0;
         const balanceCents = Math.round((account.type === 'credit' ? -Math.abs(raw) : raw) * 100);
@@ -150,6 +157,14 @@ export async function refreshAll() {
     results.push(collectrResult.value);
   } else {
     results.push({ source: 'collectr', status: 'error', message: collectrResult.reason?.message, lastUpdated: null });
+  }
+
+  // Account masks may have just been (back)filled above; re-run categorization
+  // so cached transfers get re-judged as internal (excluded) vs external income.
+  try {
+    recategorizeAllTransactions();
+  } catch (err) {
+    console.warn('[refreshAll] re-categorization skipped:', err.message);
   }
 
   const hasError = results.some((r) => r.status === 'error' || r.status === 'needs_reauth');
