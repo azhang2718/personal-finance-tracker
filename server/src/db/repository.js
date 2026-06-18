@@ -1,10 +1,9 @@
 import { getDb } from './schema.js';
 import { encrypt, decrypt } from '../crypto/index.js';
-import { cleanCategory, EXCLUDED_FROM_SPENDING } from '../spending/categorize.js';
+import { cleanCategory } from '../spending/categorize.js';
 
-// SQL fragment: a parenthesised, quoted list of categories excluded from
-// spending totals, e.g. ('Transfer', 'Credit Card Payment').
-const EXCLUDED_SQL = `(${EXCLUDED_FROM_SPENDING.map((c) => `'${c}'`).join(', ')})`;
+// Effective category = your manual override if set, else the auto one.
+const EFFECTIVE_CATEGORY = `COALESCE(NULLIF(t.user_category, ''), t.category)`;
 
 // ─── Snapshots ────────────────────────────────────────────────────────────────
 
@@ -268,6 +267,8 @@ export function upsertTransaction({ id, accountId, date, name, amountCents, cate
       category = excluded.category,
       pending = excluded.pending
   `).run(id, accountId, date, name, amountCents, category, pending ? 1 : 0);
+  // NB: user_category and excluded are intentionally NOT updated on conflict, so
+  // a manual recategorization or delete survives the next Plaid re-sync.
 }
 
 /**
@@ -298,11 +299,9 @@ export function recategorizeAllTransactions() {
 
 /**
  * Monthly expense/income totals from the transactions cache, oldest→newest.
- * Expenses: positive amounts on cash/credit accounts, with transfers and
- * credit-card payments excluded (see EXCLUDED_FROM_SPENDING). Income: inflows
- * (negative amount) on a depository ('cash') account, sign-flipped, with the
- * same exclusions — so internal account-to-account moves and card payments
- * don't inflate income, but P2P money (Venmo/Zelle, categorized 'P2P') counts.
+ * Every transaction counts unless you've deleted it (excluded = 1): expenses are
+ * outflows (positive) on cash/credit, income is inflows (negative, sign-flipped)
+ * on cash. No category-based exclusions — curation is manual via the txn list.
  */
 export function getSpendingByMonth(sinceDate) {
   const db = getDb();
@@ -310,37 +309,81 @@ export function getSpendingByMonth(sinceDate) {
     SELECT
       substr(t.date, 1, 7) AS month,
       SUM(CASE WHEN t.amount_cents > 0 AND a.type IN ('cash','credit')
-                AND t.category NOT IN ${EXCLUDED_SQL}
                THEN t.amount_cents ELSE 0 END) AS expenses_cents,
       SUM(CASE WHEN t.amount_cents < 0 AND a.type = 'cash'
-                AND t.category NOT IN ${EXCLUDED_SQL}
                THEN -t.amount_cents ELSE 0 END) AS income_cents
     FROM transactions_cache t
     JOIN accounts a ON a.id = t.account_id
     WHERE t.date >= ?
       AND t.pending = 0
+      AND t.excluded = 0
     GROUP BY substr(t.date, 1, 7)
     ORDER BY month ASC
   `).all(sinceDate);
 }
 
 /**
- * Current-month expenses by category, sorted desc. Same exclusions as above.
+ * One month's spending grouped by effective category (outflows only), sorted
+ * desc. Includes every non-deleted outflow — no category exclusions.
  */
 export function getSpendingByCategory(monthPrefix) {
   const db = getDb();
   return db.prepare(`
-    SELECT t.category AS category, SUM(t.amount_cents) AS cents
+    SELECT ${EFFECTIVE_CATEGORY} AS category, SUM(t.amount_cents) AS cents
     FROM transactions_cache t
     JOIN accounts a ON a.id = t.account_id
     WHERE substr(t.date, 1, 7) = ?
       AND t.pending = 0
+      AND t.excluded = 0
       AND t.amount_cents > 0
       AND a.type IN ('cash','credit')
-      AND t.category NOT IN ${EXCLUDED_SQL}
-    GROUP BY t.category
+    GROUP BY category
     ORDER BY cents DESC
   `).all(monthPrefix);
+}
+
+/**
+ * Every cached transaction for one month (newest first), including deleted ones
+ * (excluded = 1) so the UI can show and restore them. `category` is the
+ * effective category; `amount_cents` keeps Plaid's sign (positive = money out).
+ */
+export function getTransactionsForMonth(monthPrefix) {
+  const db = getDb();
+  return db.prepare(`
+    SELECT t.id AS id, t.date AS date, t.name AS name,
+           t.amount_cents AS amount_cents,
+           ${EFFECTIVE_CATEGORY} AS category,
+           t.category AS auto_category,
+           t.user_category AS user_category,
+           t.excluded AS excluded,
+           a.name AS account, a.type AS account_type
+    FROM transactions_cache t
+    JOIN accounts a ON a.id = t.account_id
+    WHERE substr(t.date, 1, 7) = ?
+      AND t.pending = 0
+      AND a.type IN ('cash','credit')
+    ORDER BY t.date DESC, t.amount_cents DESC
+  `).all(monthPrefix);
+}
+
+/**
+ * Set a manual category override (or clear it, reverting to auto, when blank).
+ * Returns true if a row was affected.
+ */
+export function setTransactionCategory(id, category) {
+  const db = getDb();
+  const value = category && String(category).trim() !== '' ? String(category).trim() : null;
+  return db.prepare(`UPDATE transactions_cache SET user_category = ? WHERE id = ?`).run(value, id).changes > 0;
+}
+
+/**
+ * Soft-delete (excluded = 1) or restore (0) a transaction. Returns true if a
+ * row was affected.
+ */
+export function setTransactionExcluded(id, excluded) {
+  const db = getDb();
+  return db.prepare(`UPDATE transactions_cache SET excluded = ? WHERE id = ?`)
+    .run(excluded ? 1 : 0, id).changes > 0;
 }
 
 // ─── Snapshots read ───────────────────────────────────────────────────────────

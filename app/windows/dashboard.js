@@ -26,6 +26,16 @@
   // Stored spending data so we can re-render cashflow + AI after series loads
   let latestSpending = null;
   let latestCurrent  = null;
+  // Month currently shown in the spending tab (category list + txn table).
+  let selectedSpendMonth = null;
+
+  // Categories selectable when recategorizing a transaction (ordered).
+  const SPEND_CATEGORIES = [
+    'Income', 'Food & Drink', 'Coffee', 'Groceries', 'Transport', 'Travel',
+    'Shopping', 'Entertainment', 'Bills & Utilities', 'Health', 'Personal Care',
+    'Services', 'Fees', 'Loan Payments', 'P2P', 'Bank Transfer', 'Transfer',
+    'Credit Card Payment', 'Other',
+  ];
 
   // Preferences (stored in localStorage)
   const PREF_KEY = 'pf_prefs';
@@ -717,23 +727,161 @@
     }
   }
 
-  // Month picker change → show that month's categories (current month uses the
-  // already-loaded summary; older months fetch from the cache-backed endpoint).
-  async function onMonthSelectChange() {
+  // Month picker change → show that month's category breakdown + transactions.
+  function onMonthSelectChange() {
     const sel = $('month-select');
-    if (!sel || !latestSpending) return;
-    const month = sel.value;
-    const months = latestSpending.months || [];
+    if (!sel) return;
+    selectedSpendMonth = sel.value;
+    renderSelectedMonth();
+  }
+
+  // Render the category breakdown and transaction table for selectedSpendMonth.
+  // The current month's breakdown rides along in the summary; older months and
+  // the (always live) transaction list are fetched from the cache-backed API.
+  async function renderSelectedMonth() {
+    const month = selectedSpendMonth;
+    if (!month) return;
+    const months = (latestSpending && latestSpending.months) || [];
     const currentMonth = months.length ? months[months.length - 1].month : null;
-    if (month === currentMonth && latestSpending.current_month) {
+
+    if (month === currentMonth && latestSpending && latestSpending.current_month) {
       renderCategoryList(latestSpending.current_month.by_category);
-      return;
+    } else {
+      try {
+        const data = await API.fetchJson(`/api/spending/by-category?month=${month}`);
+        renderCategoryList(data.by_category);
+      } catch {
+        renderCategoryList([]);
+      }
     }
+
     try {
-      const data = await API.fetchJson(`/api/spending/by-category?month=${month}`);
-      renderCategoryList(data.by_category);
+      const data = await API.fetchJson(`/api/spending/transactions?month=${month}`);
+      renderTransactions(data.transactions || [], month);
     } catch {
-      renderCategoryList([]);
+      renderTransactions([], month);
+    }
+  }
+
+  // Re-fetch the spending summary fresh (server has recomputed totals after an
+  // edit), refresh the SWR cache so the next load isn't stale, and re-render —
+  // keeping the currently selected month. renderSpending() calls back into
+  // renderSelectedMonth(), which re-pulls the edited month's category + txns.
+  async function reloadSpendingAfterEdit() {
+    try {
+      const fresh = await API.fetchJson('/api/spending/summary?months=6');
+      try { await window.bridge.setCache('GET /api/spending/summary?months=6', { data: fresh, cachedAt: new Date().toISOString() }); } catch {}
+      renderSpending(fresh);
+    } catch {
+      // Network hiccup — leave the optimistic UI as-is; next load reconciles.
+    }
+  }
+
+  function formatTxnDate(ymd) {
+    const d = new Date(ymd + 'T00:00:00');
+    return isNaN(d.getTime()) ? ymd : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }
+
+  // Build one transaction row. `deleted` switches the trailing control between
+  // a delete (trash) and a restore (undo) button.
+  function buildTxnRow(t, deleted) {
+    const row = document.createElement('div');
+    row.className = 'txn-row';
+
+    // Signed so an inflow (Plaid negative) reads as +income, an outflow as −spend.
+    const signed = -t.amount_cents;
+    const amtClass = signed >= 0 ? 'pos' : 'neg';
+    const amtText = (signed >= 0 ? '+' : '−') + FMT.dollars(Math.abs(signed));
+
+    // Make sure the current category is always an option even if non-standard.
+    const cats = SPEND_CATEGORIES.includes(t.category)
+      ? SPEND_CATEGORIES
+      : [t.category, ...SPEND_CATEGORIES];
+    const options = cats
+      .map((c) => `<option value="${escapeHtml(c)}"${c === t.category ? ' selected' : ''}>${escapeHtml(prettify(c))}</option>`)
+      .join('');
+
+    const ctrl = deleted
+      ? `<button class="txn-restore" title="Restore transaction" aria-label="Restore">
+           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+         </button>`
+      : `<button class="txn-del" title="Delete transaction" aria-label="Delete">
+           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6M14 11v6"/></svg>
+         </button>`;
+
+    row.innerHTML =
+      `<span class="txn-date">${escapeHtml(formatTxnDate(t.date))}</span>
+       <div class="txn-main">
+         <div class="txn-name">${escapeHtml(t.name || '—')}</div>
+         <div class="txn-acct">${escapeHtml(t.account || '')}</div>
+       </div>
+       <select class="txn-cat-select${t.is_custom_category ? ' custom' : ''}" title="Recategorize">${options}</select>
+       <span class="txn-amt ${amtClass}">${amtText}</span>
+       ${ctrl}`;
+
+    const select = row.querySelector('.txn-cat-select');
+    if (select) {
+      select.addEventListener('change', async () => {
+        select.disabled = true;
+        try {
+          await API.putJson(`/api/spending/transactions/${encodeURIComponent(t.id)}/category`, { category: select.value });
+          await reloadSpendingAfterEdit();
+        } catch {
+          select.disabled = false;
+        }
+      });
+    }
+    const btn = row.querySelector(deleted ? '.txn-restore' : '.txn-del');
+    if (btn) {
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        try {
+          if (deleted) await API.postJson(`/api/spending/transactions/${encodeURIComponent(t.id)}/restore`);
+          else await API.del(`/api/spending/transactions/${encodeURIComponent(t.id)}`);
+          await reloadSpendingAfterEdit();
+        } catch {
+          btn.disabled = false;
+        }
+      });
+    }
+    return row;
+  }
+
+  // Render the editable transaction table for one month (active rows + a
+  // collapsible list of soft-deleted ones that can be restored).
+  function renderTransactions(transactions, month) {
+    const all = transactions || [];
+    const active = all.filter((t) => !t.excluded);
+    const deleted = all.filter((t) => t.excluded);
+
+    const labelEl = $('txn-month-label');
+    if (labelEl) labelEl.textContent = monthLabelLong(month);
+    const countEl = $('txn-count');
+    if (countEl) countEl.textContent = String(active.length);
+
+    const list = $('txn-list');
+    if (list) {
+      list.innerHTML = '';
+      if (active.length === 0) {
+        list.innerHTML = '<p class="txn-empty">No transactions recorded this month.</p>';
+      } else {
+        for (const t of active) list.appendChild(buildTxnRow(t, false));
+      }
+    }
+
+    const wrap = $('txn-deleted-wrap');
+    const dList = $('txn-deleted-list');
+    if (wrap && dList) {
+      if (deleted.length === 0) {
+        wrap.hidden = true;
+        dList.innerHTML = '';
+      } else {
+        wrap.hidden = false;
+        const lbl = $('txn-deleted-label');
+        if (lbl) lbl.textContent = `Deleted (${deleted.length})`;
+        dList.innerHTML = '';
+        for (const t of deleted) dList.appendChild(buildTxnRow(t, true));
+      }
     }
   }
 
@@ -754,6 +902,9 @@
     'Loan Payments':     '#9aa4b0',
     'P2P':               '#c084fc',
     'Bank Transfer':     '#60a5fa',
+    'Income':            '#34e29b',
+    'Transfer':          '#7c8694',
+    'Credit Card Payment': '#7c8694',
     'Other':             '#5b6573',
   };
 
@@ -818,10 +969,14 @@
       savedEl.className = 'kpi-val num ' + (saved >= 0 ? 'pos' : 'neg');
     }
 
-    // Month picker + category list (defaults to the most recent month)
+    // Month picker + category list + transactions (defaults to the most recent
+    // month; preserves the user's selection across edit-driven re-renders).
     const currentMonth = months.length ? months[months.length - 1].month : null;
-    populateMonthSelect(months, currentMonth);
-    renderCategoryList(cur.by_category);
+    if (!selectedSpendMonth || !months.some((m) => m.month === selectedSpendMonth)) {
+      selectedSpendMonth = currentMonth;
+    }
+    populateMonthSelect(months, selectedSpendMonth);
+    renderSelectedMonth();
 
     // Rail KPIs on dashboard
     renderRailKpis(cur, months);
@@ -1945,6 +2100,18 @@
     // Spending month picker
     const monthSel = $('month-select');
     if (monthSel) monthSel.addEventListener('change', onMonthSelectChange);
+
+    // Collapsible "Deleted" section in the transaction table
+    const delToggle = $('txn-deleted-toggle');
+    if (delToggle) {
+      delToggle.addEventListener('click', () => {
+        const dList = $('txn-deleted-list');
+        if (!dList) return;
+        const open = dList.hidden;
+        dList.hidden = !open;
+        delToggle.classList.toggle('open', open);
+      });
+    }
 
     // AI ask box
     const askForm = $('ai-ask-form');

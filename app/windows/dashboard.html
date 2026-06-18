@@ -383,6 +383,24 @@
               </div>
             </section>
           </div>
+
+          <!-- All transactions for the selected month (editable) -->
+          <section class="glass-card txn-card">
+            <div class="spend-card-head">
+              <div>
+                <div class="card-title">All Transactions</div>
+                <div class="card-sub soft"><span id="txn-month-label">—</span> · <span id="txn-count">0</span> shown · recategorize or delete to update the totals above</div>
+              </div>
+            </div>
+            <div class="txn-list" id="txn-list"></div>
+            <div class="txn-deleted-wrap" id="txn-deleted-wrap" hidden>
+              <button class="txn-deleted-toggle" id="txn-deleted-toggle" type="button">
+                <span id="txn-deleted-label">Deleted (0)</span>
+                <span class="txn-deleted-caret">▾</span>
+              </button>
+              <div class="txn-list txn-list-deleted" id="txn-deleted-list" hidden></div>
+            </div>
+          </section>
         </section>
 
         <!-- ====== TAB: SUMMARY ====== -->

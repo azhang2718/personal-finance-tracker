@@ -105,5 +105,20 @@ export function runMigrations() {
     db.exec(`ALTER TABLE accounts ADD COLUMN mask TEXT NULL`);
   }
 
+  // Idempotent column adds for manual curation of cached transactions:
+  //   user_category — a category you set by hand; overrides the auto one and
+  //                   survives Plaid re-syncs (the auto `category` is still
+  //                   refreshed underneath, but the override wins when present).
+  //   excluded      — a soft "delete": hidden from all spending totals, the
+  //                   category breakdown, and the monthly history, but kept so
+  //                   it can be restored and isn't re-added on the next sync.
+  const txCols = db.prepare(`SELECT name FROM pragma_table_info('transactions_cache')`).all().map((r) => r.name);
+  if (!txCols.includes('user_category')) {
+    db.exec(`ALTER TABLE transactions_cache ADD COLUMN user_category TEXT NULL`);
+  }
+  if (!txCols.includes('excluded')) {
+    db.exec(`ALTER TABLE transactions_cache ADD COLUMN excluded INTEGER NOT NULL DEFAULT 0`);
+  }
+
   console.log('[db] Migrations complete');
 }

@@ -527,6 +527,74 @@
 .spending-chart-card { padding: 24px; }
 .bar-box { position: relative; height: 240px; margin-top: 20px; }
 
+/* ---- All transactions (editable) ---- */
+.txn-card { padding: 24px; margin-top: 22px; }
+.txn-list { display: flex; flex-direction: column; margin-top: 18px; }
+.txn-row {
+  display: grid;
+  grid-template-columns: 64px 1fr auto auto 30px;
+  align-items: center; gap: 14px;
+  padding: 10px 8px; border-radius: 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.045);
+}
+.txn-row:last-child { border-bottom: none; }
+.txn-row:hover { background: rgba(255,255,255,0.025); }
+.txn-date { font-family: var(--font-mono); font-size: 11px; color: var(--ink-muted); }
+.txn-main { min-width: 0; }
+.txn-name {
+  font-size: 13px; font-weight: 500;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.txn-acct { font-size: 11px; color: var(--ink-muted); margin-top: 2px; }
+.txn-cat-select {
+  padding: 5px 26px 5px 10px; border-radius: 8px;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07);
+  color: var(--ink-soft); font-family: var(--font-mono); font-size: 11px;
+  cursor: pointer; appearance: none; -webkit-appearance: none; max-width: 150px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%239aa4b0' stroke-width='3'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 9px center;
+}
+.txn-cat-select:hover { background-color: rgba(255,255,255,0.07); }
+.txn-cat-select:focus { outline: none; border-color: rgba(34,211,238,0.4); }
+.txn-cat-select.custom { border-color: rgba(34,211,238,0.35); color: var(--ink); }
+.txn-cat-select option { background: #11161d; color: var(--ink); }
+.txn-amt {
+  font-family: var(--font-mono); font-size: 12.5px; font-weight: 600;
+  text-align: right; min-width: 88px;
+}
+.txn-amt.pos { color: var(--pos); }
+.txn-amt.neg { color: var(--ink); }
+.txn-del {
+  width: 26px; height: 26px; border-radius: 7px; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: transparent; border: 1px solid transparent;
+  color: var(--ink-muted); cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+.txn-del:hover { background: rgba(248,113,113,0.12); color: var(--neg); border-color: rgba(248,113,113,0.25); }
+.txn-empty { font-size: 13px; color: var(--ink-muted); padding: 18px 0; }
+
+.txn-deleted-wrap { margin-top: 14px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 12px; }
+.txn-deleted-toggle {
+  display: flex; align-items: center; gap: 8px;
+  background: transparent; border: none; cursor: pointer;
+  color: var(--ink-muted); font-size: 12px; font-family: var(--font-mono);
+  padding: 4px 0;
+}
+.txn-deleted-toggle:hover { color: var(--ink-soft); }
+.txn-deleted-caret { transition: transform 0.15s ease; }
+.txn-deleted-toggle.open .txn-deleted-caret { transform: rotate(180deg); }
+.txn-list-deleted .txn-row { opacity: 0.55; }
+.txn-list-deleted .txn-name { text-decoration: line-through; }
+.txn-restore {
+  width: 26px; height: 26px; border-radius: 7px; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: transparent; border: 1px solid transparent;
+  color: var(--ink-muted); cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+.txn-restore:hover { background: var(--accent-soft); color: var(--accent); border-color: rgba(34,211,238,0.25); }
+
 /* ---- SUMMARY tab ---- */
 .summary-top-row {
   display: grid; grid-template-columns: 1fr 1fr; gap: 22px;
