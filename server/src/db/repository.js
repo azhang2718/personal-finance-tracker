@@ -4,6 +4,23 @@ import { cleanCategory } from '../spending/categorize.js';
 
 // Effective category = your manual override if set, else the auto one.
 const EFFECTIVE_CATEGORY = `COALESCE(NULLIF(t.user_category, ''), t.category)`;
+// Exclude common autopay / automatic-payment descriptions that represent
+// credit-card autopays or "automatic payment - thank you" messages which
+// would otherwise double-count income/expense when paired with the underlying
+// charge. Also exclude compact credit-card payment markers like "crc ard pmt"
+// / "crcard" that banks sometimes emit (e.g. "CAPITAL ONE CRCARDPMT ...").
+// Condition allows NULL names (keeps them) and filters known autopay patterns.
+const AUTOPAY_EXCLUDE_SQL = `
+  AND (t.name IS NULL OR (
+    LOWER(t.name) NOT LIKE '%autopay%' AND
+    LOWER(t.name) NOT LIKE '%automatic payment%' AND
+    LOWER(t.name) NOT LIKE '%thank you%' AND
+    LOWER(t.name) NOT LIKE '%crcard%' AND
+    LOWER(t.name) NOT LIKE '%card payment%' AND
+    LOWER(t.name) NOT LIKE '%credit card%' AND
+    LOWER(t.name) NOT LIKE '%cc autopay%'
+  ))
+`;
 
 // ─── Snapshots ────────────────────────────────────────────────────────────────
 
@@ -272,6 +289,16 @@ export function upsertTransaction({ id, accountId, date, name, amountCents, cate
 }
 
 /**
+ * Hard-delete a cached transaction by id. Used when a pending charge settles
+ * under a new transaction_id and Plaid points us at the old one to retire.
+ * Returns true if a row was removed.
+ */
+export function deleteTransaction(id) {
+  const db = getDb();
+  return db.prepare(`DELETE FROM transactions_cache WHERE id = ?`).run(id).changes > 0;
+}
+
+/**
  * Re-run categorization over every cached transaction using the current rules.
  * Stored rows only carry a name + a previously-stored category (no Plaid
  * `detailed`), which is exactly what cleanCategory() is built to handle. Run at
@@ -302,6 +329,8 @@ export function recategorizeAllTransactions() {
  * Every transaction counts unless you've deleted it (excluded = 1): expenses are
  * outflows (positive) on cash/credit, income is inflows (negative, sign-flipped)
  * on cash. No category-based exclusions — curation is manual via the txn list.
+ * Pending transactions are included so recent activity shows immediately; their
+ * totals firm up once they settle (see refreshTransactionsCache).
  */
 export function getSpendingByMonth(sinceDate) {
   const db = getDb();
@@ -315,8 +344,8 @@ export function getSpendingByMonth(sinceDate) {
     FROM transactions_cache t
     JOIN accounts a ON a.id = t.account_id
     WHERE t.date >= ?
-      AND t.pending = 0
       AND t.excluded = 0
+      ${AUTOPAY_EXCLUDE_SQL}
     GROUP BY substr(t.date, 1, 7)
     ORDER BY month ASC
   `).all(sinceDate);
@@ -333,8 +362,8 @@ export function getSpendingByCategory(monthPrefix) {
     FROM transactions_cache t
     JOIN accounts a ON a.id = t.account_id
     WHERE substr(t.date, 1, 7) = ?
-      AND t.pending = 0
       AND t.excluded = 0
+      ${AUTOPAY_EXCLUDE_SQL}
       AND t.amount_cents > 0
       AND a.type IN ('cash','credit')
     GROUP BY category
@@ -344,8 +373,9 @@ export function getSpendingByCategory(monthPrefix) {
 
 /**
  * Every cached transaction for one month (newest first), including deleted ones
- * (excluded = 1) so the UI can show and restore them. `category` is the
- * effective category; `amount_cents` keeps Plaid's sign (positive = money out).
+ * (excluded = 1) so the UI can show and restore them, and pending ones (flagged
+ * via `pending`). `category` is the effective category; `amount_cents` keeps
+ * Plaid's sign (positive = money out).
  */
 export function getTransactionsForMonth(monthPrefix) {
   const db = getDb();
@@ -356,13 +386,14 @@ export function getTransactionsForMonth(monthPrefix) {
            t.category AS auto_category,
            t.user_category AS user_category,
            t.excluded AS excluded,
+           t.pending AS pending,
            a.name AS account, a.type AS account_type
     FROM transactions_cache t
     JOIN accounts a ON a.id = t.account_id
     WHERE substr(t.date, 1, 7) = ?
-      AND t.pending = 0
       AND a.type IN ('cash','credit')
-    ORDER BY t.date DESC, t.amount_cents DESC
+      ${AUTOPAY_EXCLUDE_SQL}
+    ORDER BY t.date DESC, ABS(t.amount_cents) DESC
   `).all(monthPrefix);
 }
 

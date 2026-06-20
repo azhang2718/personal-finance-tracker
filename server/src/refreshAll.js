@@ -13,6 +13,7 @@ import {
 } from './db/repository.js';
 import { scrapeCollectr } from './collectr/scrape.js';
 import { splitInvestmentSnapshots } from './plaid/investments.js';
+import { refreshTransactionsCache } from './spending/refreshTransactions.js';
 import { todayStr } from './util/date.js';
 
 function mapPlaidType(plaidType, plaidSubtype) {
@@ -157,6 +158,15 @@ export async function refreshAll() {
     results.push(collectrResult.value);
   } else {
     results.push({ source: 'collectr', status: 'error', message: collectrResult.reason?.message, lastUpdated: null });
+  }
+
+  // Pull fresh transactions too — a manual refresh should update the spending
+  // list, not just balances. Forced past the 12h throttle so the reload button
+  // always reflects the latest activity. Errors never fail the whole refresh.
+  try {
+    await refreshTransactionsCache({ force: true });
+  } catch (err) {
+    console.warn('[refreshAll] transaction refresh skipped:', err.message);
   }
 
   // Account masks may have just been (back)filled above; re-run categorization

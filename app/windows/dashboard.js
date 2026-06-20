@@ -36,10 +36,9 @@
 
   // Categories selectable when recategorizing a transaction (ordered).
   const SPEND_CATEGORIES = [
-    'Income', 'Food & Drink', 'Coffee', 'Groceries', 'Transport', 'Travel',
-    'Shopping', 'Entertainment', 'Bills & Utilities', 'Health', 'Personal Care',
-    'Services', 'Fees', 'Loan Payments', 'P2P', 'Bank Transfer', 'Transfer',
-    'Credit Card Payment', 'Other',
+    'Income', 'Food & Drink', 'Transport & Travel', 'Shopping', 'Entertainment',
+    'Bills & Utilities', 'Services', 'Fees & Payments', 'P2P', 'Bank Transfer',
+    'Transfer', 'Other',
   ];
 
   // Preferences (stored in localStorage)
@@ -814,10 +813,14 @@
            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6M14 11v6"/></svg>
          </button>`;
 
+    const pendingTag = t.pending
+      ? '<span class="txn-pending" title="Pending — not yet settled at the bank">pending</span>'
+      : '';
+
     row.innerHTML =
       `<span class="txn-date">${escapeHtml(formatTxnDate(t.date))}</span>
        <div class="txn-main">
-         <div class="txn-name">${escapeHtml(t.name || '—')}</div>
+         <div class="txn-name">${escapeHtml(t.name || '—')}${pendingTag}</div>
          <div class="txn-acct">${escapeHtml(t.account || '')}</div>
        </div>
        <select class="txn-cat-select${t.is_custom_category ? ' custom' : ''}" title="Recategorize">${options}</select>
@@ -943,25 +946,18 @@
 
   // Keyed on the clean category labels emitted by the server's categorizer.
   const CAT_COLORS = {
-    'Food & Drink':      '#22d3ee',
-    'Coffee':            '#f59e0b',
-    'Groceries':         '#84cc16',
-    'Travel':            '#a78bfa',
-    'Transport':         '#38bdf8',
-    'Shopping':          '#f472b6',
-    'Entertainment':     '#818cf8',
-    'Bills & Utilities': '#fbbf24',
-    'Health':            '#34e29b',
-    'Personal Care':     '#fb7185',
-    'Services':          '#2dd4bf',
-    'Fees':              '#9aa4b0',
-    'Loan Payments':     '#9aa4b0',
-    'P2P':               '#c084fc',
-    'Bank Transfer':     '#60a5fa',
-    'Income':            '#34e29b',
-    'Transfer':          '#7c8694',
-    'Credit Card Payment': '#7c8694',
-    'Other':             '#5b6573',
+    'Food & Drink':       '#22d3ee',
+    'Transport & Travel': '#38bdf8',
+    'Shopping':           '#f472b6',
+    'Entertainment':      '#818cf8',
+    'Bills & Utilities':  '#fbbf24',
+    'Services':           '#2dd4bf',
+    'Fees & Payments':    '#9aa4b0',
+    'P2P':                '#c084fc',
+    'Bank Transfer':      '#60a5fa',
+    'Income':             '#34e29b',
+    'Transfer':           '#7c8694',
+    'Other':              '#5b6573',
   };
 
   function catColor(cat) {
@@ -970,22 +966,18 @@
 
   // Inner SVG (24×24, stroke=currentColor) per category label.
   const CAT_ICONS = {
-    'Food & Drink':      '<path d="M3 2v7a3 3 0 0 0 6 0V2M6 9v13"/><path d="M16 2c-1.5 0-2.5 2-2.5 4.5S15 11 16 11v11"/>',
-    'Coffee':            '<path d="M17 8h1a4 4 0 0 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4z"/><path d="M6 1v2M10 1v2M14 1v2"/>',
-    'Groceries':         '<circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6"/>',
-    'Travel':            '<path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7z"/>',
-    'Transport':         '<path d="M3 13l1.5-5A2 2 0 0 1 6.4 6.7h11.2a2 2 0 0 1 1.9 1.3L21 13"/><path d="M3 13h18v4H3z"/><circle cx="7.5" cy="17.5" r="1.5"/><circle cx="16.5" cy="17.5" r="1.5"/>',
-    'Shopping':          '<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/>',
-    'Entertainment':     '<circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/>',
-    'Bills & Utilities': '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
-    'Health':            '<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1.1L12 21l7.8-7.5 1-1.1a5.5 5.5 0 0 0 0-7.8z"/>',
-    'Personal Care':     '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
-    'Services':          '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.8-2.8z"/>',
-    'Fees':              '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
-    'Loan Payments':     '<rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/>',
-    'P2P':               '<path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>',
-    'Bank Transfer':     '<path d="M3 21h18"/><path d="M5 21V10M19 21V10M9 21V10M15 21V10"/><path d="M12 3 3 8h18z"/>',
-    'Other':             '<path d="M20.6 13.4 12 22l-9-9V3h10z"/><circle cx="7.5" cy="7.5" r="1.5"/>',
+    'Food & Drink':       '<path d="M3 2v7a3 3 0 0 0 6 0V2M6 9v13"/><path d="M16 2c-1.5 0-2.5 2-2.5 4.5S15 11 16 11v11"/>',
+    'Transport & Travel': '<path d="M3 13l1.5-5A2 2 0 0 1 6.4 6.7h11.2a2 2 0 0 1 1.9 1.3L21 13"/><path d="M3 13h18v4H3z"/><circle cx="7.5" cy="17.5" r="1.5"/><circle cx="16.5" cy="17.5" r="1.5"/>',
+    'Shopping':           '<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/>',
+    'Entertainment':      '<circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/>',
+    'Bills & Utilities':  '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
+    'Services':           '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.8-2.8z"/>',
+    'Fees & Payments':    '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
+    'P2P':                '<path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>',
+    'Bank Transfer':      '<path d="M3 21h18"/><path d="M5 21V10M19 21V10M9 21V10M15 21V10"/><path d="M12 3 3 8h18z"/>',
+    'Income':             '<line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>',
+    'Transfer':           '<path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>',
+    'Other':              '<path d="M20.6 13.4 12 22l-9-9V3h10z"/><circle cx="7.5" cy="7.5" r="1.5"/>',
   };
 
   function catIcon(cat) {

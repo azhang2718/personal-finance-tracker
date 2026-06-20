@@ -12,41 +12,56 @@
 // counted, so counting the payment too would double-count).
 
 // Plaid PFC primary → clean bucket. OTHER is intentionally absent so it falls
-// through to the name rules below.
+// through to the name rules below. Buckets are intentionally coarse: coffee and
+// groceries fold into Food & Drink, transport and travel share one bucket, fees
+// / loan payments / card payments share Fees & Payments, and medical / personal
+// care just land in Other.
 const PRIMARY_MAP = {
   FOOD_AND_DRINK: 'Food & Drink',
   GENERAL_MERCHANDISE: 'Shopping',
-  TRANSPORTATION: 'Transport',
-  TRAVEL: 'Travel',
+  TRANSPORTATION: 'Transport & Travel',
+  TRAVEL: 'Transport & Travel',
   ENTERTAINMENT: 'Entertainment',
   RENT_AND_UTILITIES: 'Bills & Utilities',
-  MEDICAL: 'Health',
-  PERSONAL_CARE: 'Personal Care',
+  MEDICAL: 'Other',
+  PERSONAL_CARE: 'Other',
   GENERAL_SERVICES: 'Services',
   GOVERNMENT_AND_NON_PROFIT: 'Services',
-  BANK_FEES: 'Fees',
-  LOAN_PAYMENTS: 'Loan Payments',
+  BANK_FEES: 'Fees & Payments',
+  LOAN_PAYMENTS: 'Fees & Payments',
   TRANSFER_IN: 'Transfer',
   TRANSFER_OUT: 'Transfer',
   INCOME: 'Income',
 };
 
-// Ordered merchant-name rules: first match wins. Order matters — Coffee before
-// Food & Drink (a "coffee" shop shouldn't be generic food), Groceries before
-// Shopping (a grocery store isn't general shopping).
+// Retired labels → their current merged bucket. Applied first in cleanCategory
+// so transactions stored under an old category get folded in on the next
+// re-categorization pass (no Plaid refresh needed).
+const MERGED_CATEGORIES = {
+  Coffee: 'Food & Drink',
+  Groceries: 'Food & Drink',
+  Transport: 'Transport & Travel',
+  Travel: 'Transport & Travel',
+  Health: 'Other',
+  'Personal Care': 'Other',
+  Fees: 'Fees & Payments',
+  'Loan Payments': 'Fees & Payments',
+  'Credit Card Payment': 'Fees & Payments',
+};
+
+// Ordered merchant-name rules: first match wins.
 const NAME_RULES = [
-  [/coffee|café|\bcafe\b|espresso|\blatte\b|roaster|starbucks|dunkin|peet'?s/i, 'Coffee'],
-  [/grocery|grocer|supermarket|whole foods|trader joe|safeway|kroger|\bh-?e-?b\b|\baldi\b|costco|publix|wegmans|sam'?s club|samsclub/i, 'Groceries'],
+  [/coffee|café|\bcafe\b|espresso|\blatte\b|roaster|starbucks|dunkin|peet'?s/i, 'Food & Drink'],
+  [/grocery|grocer|supermarket|whole foods|trader joe|safeway|kroger|\bh-?e-?b\b|\baldi\b|costco|publix|wegmans|sam'?s club|samsclub/i, 'Food & Drink'],
   [/\btst\*|restaurant|grill|kitchen|pizza|\btaco|sushi|ramen|\bthai\b|\bbbq\b|burger|eatery|diner|bistro|grubhub|doordash|uber\s?eats|mcdonald|chipotle|panera|chick-?fil|noodle|\bdeli\b|bakery|\bbar\b|cantina/i, 'Food & Drink'],
-  [/\bair(line|ways|lines)?\b|qatar|emirates|\bklm\b|lufthansa|\bflight\b|\bhotel\b|airbnb|expedia|booking\.com|marriott|hilton|hyatt|\bdelta\b|united air|southwest air|american air/i, 'Travel'],
-  [/\buber\b|\blyft\b|shell|chevron|exxon|\bmobil\b|\bgas\b|fuel|parking|\bmetro\b|capmetro|cap metro|transit|\btoll\b|amtrak|\bbp\b/i, 'Transport'],
+  [/\bair(line|ways|lines)?\b|qatar|emirates|\bklm\b|lufthansa|\bflight\b|\bhotel\b|airbnb|expedia|booking\.com|marriott|hilton|hyatt|\bdelta\b|united air|southwest air|american air/i, 'Transport & Travel'],
+  [/\buber\b|\blyft\b|shell|chevron|exxon|\bmobil\b|\bgas\b|fuel|parking|\bmetro\b|capmetro|cap metro|transit|\btoll\b|amtrak|\bbp\b/i, 'Transport & Travel'],
   [/amazon|aliexpress|\bebay\b|\betsy\b|target|walmart|best buy|\bikea\b|\bnike\b|uniqlo|\bh&m\b/i, 'Shopping'],
   [/steam|spotify|netflix|\bhulu\b|disney\+|\bxbox\b|playstation|nintendo|cinema|\bamc\b|\bmovie|patreon|twitch/i, 'Entertainment'],
-  [/pharmacy|\bcvs\b|walgreens|\bclinic\b|dental|hospital|\bmedical\b|optometr|urgent care|\bgym\b|fitness|climbing|crossfit|\byoga\b|pilates/i, 'Health'],
   [/at&t|verizon|t-?mobile|comcast|xfinity|\belectric\b|water util|\butility\b|spectrum|google fiber/i, 'Bills & Utilities'],
 ];
 
-// Names that signal a credit-card payment (so we can exclude it from spending).
+// Names that signal a credit-card payment — bucketed with fees & loan payments.
 const CC_PAYMENT_NAME = /credit\s*(crd|card)|card\s*(payment|autopay)|\bcc\s*autopay/i;
 
 // Names that signal a peer-to-peer money app (Venmo, Zelle, Cash App, PayPal,
@@ -86,7 +101,7 @@ function refIsOwn(ref, ownMasks) {
 const CLEAN_LABELS = new Set([
   ...Object.values(PRIMARY_MAP),
   ...NAME_RULES.map(([, bucket]) => bucket),
-  'Credit Card Payment',
+  'Fees & Payments',
   'P2P',
   'Bank Transfer',
   'Other',
@@ -108,6 +123,17 @@ export function cleanCategory(primary, detailed, name, ownMasks = new Set()) {
   const raw = String(primary || '');
   const n = String(name || '');
   const p = raw.toUpperCase();
+
+  // Fold a retired category into its current merged bucket (handles rows stored
+  // under the old taxonomy without needing a Plaid refresh).
+  if (MERGED_CATEGORIES[raw]) return MERGED_CATEGORIES[raw];
+
+  // Credit-card payoffs, loans, and bank fees share one bucket. Detect first so
+  // a card autopay that Plaid happens to tag as a transfer still lands here
+  // rather than being swallowed by the transfer block below.
+  if (CC_PAYMENT_NAME.test(n) || /CREDIT_CARD/.test(String(detailed || '').toUpperCase())) {
+    return 'Fees & Payments';
+  }
 
   // Transfers need disambiguating before anything else (incl. the idempotent
   // shortcut), so already-stored 'Transfer'/'Bank Transfer' rows get re-judged
@@ -136,13 +162,7 @@ export function cleanCategory(primary, detailed, name, ownMasks = new Set()) {
   // 'Other' is the exception — retry it, in case the name rules improved.
   if (raw !== 'Other' && CLEAN_LABELS.has(raw)) return raw;
 
-  // Credit-card payoffs are a transfer between your own accounts, not spending
-  // (the underlying charges are already counted). Detect by name regardless of
-  // how Plaid — or a prior categorization pass — labelled the row.
-  if (CC_PAYMENT_NAME.test(n) || /CREDIT_CARD/.test(String(detailed || '').toUpperCase())) {
-    return 'Credit Card Payment';
-  }
-  if (p === 'LOAN_PAYMENTS') return 'Loan Payments';
+  if (p === 'LOAN_PAYMENTS') return 'Fees & Payments';
 
   // Trust Plaid when it gave a specific category.
   if (p && p !== 'OTHER' && PRIMARY_MAP[p]) return PRIMARY_MAP[p];
